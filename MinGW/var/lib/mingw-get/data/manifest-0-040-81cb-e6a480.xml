@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<package id="manifest-0-040-81cb-e6a480">
+    <release tarname="automake1.6-1.6.3-1-mingw32-doc.tar.lzma" />
+    <references>
+        <sysroot id="sysroot-0-002-a7c6-d7dbb5" />
+    </references>
+    <manifest>
+        <dir path="share/doc" />
+        <dir path="share/doc/automake1.6" />
+        <dir path="share/doc/automake1.6/1.6.3" />
+        <file path="share/doc/automake1.6/1.6.3/AUTHORS" />
+        <file path="share/doc/automake1.6/1.6.3/ChangeLog.1996" />
+        <file path="share/doc/automake1.6/1.6.3/ChangeLog.1998" />
+        <file path="share/doc/automake1.6/1.6.3/ChangeLog.2000" />
+        <file path="share/doc/automake1.6/1.6.3/ChangeLog.2001" />
+        <file path="share/doc/automake1.6/1.6.3/INSTALL" />
+        <file path="share/doc/automake1.6/1.6.3/NEWS" />
+        <file path="share/doc/automake1.6/1.6.3/README" />
+        <file path="share/doc/automake1.6/1.6.3/THANKS" />
+        <file path="share/doc/automake1.6/1.6.3/TODO" />
+        <dir path="share/doc/MinGW" />
+        <file path="share/doc/MinGW/automake1.6-1.6.3-1-mingw32.RELEASE_NOTES" />
+        <dir path="share/info" />
+        <file path="share/info/automake1.6.info" />
+    </manifest>
+</package>

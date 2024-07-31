@@ -1,0 +1,108 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "even",
+      "request": "launch",
+      "mainClass": "even",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "even1",
+      "request": "launch",
+      "mainClass": "even1",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "costomArraylist",
+      "request": "launch",
+      "mainClass": "costomArraylist",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "h",
+      "request": "launch",
+      "mainClass": "h",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "TrieNode",
+      "request": "launch",
+      "mainClass": "TrieNode",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "trie",
+      "request": "launch",
+      "mainClass": "trie",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "ll",
+      "request": "launch",
+      "mainClass": "ll",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "linkedlist",
+      "request": "launch",
+      "mainClass": "linkedlist",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "linked",
+      "request": "launch",
+      "mainClass": "linked",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "quts",
+      "request": "launch",
+      "mainClass": "quts",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "queueusingtwostck",
+      "request": "launch",
+      "mainClass": "queueusingtwostck",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "type": "java",
+      "name": "sub",
+      "request": "launch",
+      "mainClass": "sub",
+      "projectName": "java_3e0290da"
+    },
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": true,
+      "cwd": "c:/java",
+      "program": "c:/java/build/Debug/outDebug",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4366 @@
+This is automake1.5.info, produced by makeinfo version 4.8 from
+automake.texi.
+
+INFO-DIR-SECTION Software development
+START-INFO-DIR-ENTRY
+* automake-1.5: (automake1.5).		Making Makefile.in's
+END-INFO-DIR-ENTRY
+
+INFO-DIR-SECTION Individual utilities
+START-INFO-DIR-ENTRY
+* aclocal-1.5: (automake1.5)Invoking aclocal.         Generating aclocal.m4
+END-INFO-DIR-ENTRY
+
+   This file documents GNU automake 1.5
+
+   Copyright 1995, 1996, 1997, 1998, 1999, 2000 Free Software
+Foundation, Inc.
+
+   Permission is granted to make and distribute verbatim copies of this
+manual provided the copyright notice and this permission notice are
+preserved on all copies.
+
+   Permission is granted to copy and distribute modified versions of
+this manual under the conditions for verbatim copying, provided that
+the entire resulting derived work is distributed under the terms of a
+permission notice identical to this one.
+
+   Permission is granted to copy and distribute translations of this
+manual into another language, under the above conditions for modified
+versions, except that this permission notice may be stated in a
+translation approved by the Foundation.
+
+
+File: automake1.5.info,  Node: Top,  Next: Introduction,  Prev: (dir),  Up: (dir)
+
+GNU Automake
+************
+
+This file documents the GNU Automake package.  Automake is a program
+which creates GNU standards-compliant Makefiles from template files.
+This edition documents version 1.5.
+
+* Menu:
+
+* Introduction::                Automake's purpose
+* Generalities::                General ideas
+* Examples::                    Some example packages
+* Invoking Automake::           Creating a Makefile.in
+* configure::                   Scanning configure.ac or configure.in
+* Top level::                   The top-level Makefile.am
+* Alternative::                 An alternative approach to subdirectories
+* Rebuilding::                  Automatic rebuilding of Makefile
+* Programs::                    Building programs and libraries
+* Other objects::               Other derived objects
+* Other GNU Tools::             Other GNU Tools
+* Documentation::               Building documentation
+* Install::                     What gets installed
+* Clean::                       What gets cleaned
+* Dist::                        What goes in a distribution
+* Tests::                       Support for test suites
+* Options::                     Changing Automake's behavior
+* Miscellaneous::               Miscellaneous rules
+* Include::                     Including extra files in an Automake template.
+* Conditionals::                Conditionals
+* Gnits::                       The effect of `--gnu' and `--gnits'
+* Cygnus::                      The effect of `--cygnus'
+* Extending::                   Extending Automake
+* Distributing::                Distributing the Makefile.in
+* Macro and Variable Index::
+* General Index::
+
+
+File: automake1.5.info,  Node: Introduction,  Next: Generalities,  Prev: Top,  Up: Top
+
+1 Introduction
+**************
+
+Automake is a tool for automatically generating `Makefile.in's from
+files called `Makefile.am'.  Each `Makefile.am' is basically a series
+of `make' macro definitions (with rules being thrown in occasionally).
+The generated `Makefile.in's are compliant with the GNU Makefile
+standards.
+
+   The GNU Makefile Standards Document (*note Makefile Conventions:
+(standards)Makefile Conventions.)  is long, complicated, and subject to
+change.  The goal of Automake is to remove the burden of Makefile
+maintenance from the back of the individual GNU maintainer (and put it
+on the back of the Automake maintainer).
+
+   The typical Automake input file is simply a series of macro
+definitions.  Each such file is processed to create a `Makefile.in'.
+There should generally be one `Makefile.am' per directory of a project.
+
+   Automake does constrain a project in certain ways; for instance it
+assumes that the project uses Autoconf (*note Introduction:
+(autoconf)Top.), and enforces certain restrictions on the
+`configure.in' contents(1).
+
+   Automake requires `perl' in order to generate the `Makefile.in's.
+However, the distributions created by Automake are fully GNU
+standards-compliant, and do not require `perl' in order to be built.
+
+   Mail suggestions and bug reports for Automake to
+<bug-automake@gnu.org>.
+
+   ---------- Footnotes ----------
+
+   (1) Autoconf 2.50 promotes `configure.ac' over `configure.in'.  The
+rest of this documentation will refer to `configure.in' as this use is
+not yet spread, but Automake supports `configure.ac' too.
+
+
+File: automake1.5.info,  Node: Generalities,  Next: Examples,  Prev: Introduction,  Up: Top
+
+2 General ideas
+***************
+
+The following sections cover a few basic ideas that will help you
+understand how Automake works.
+
+* Menu:
+
+* General Operation::           General operation of Automake
+* Strictness::                  Standards conformance checking
+* Uniform::                     The Uniform Naming Scheme
+* Canonicalization::            How derived variables are named
+* User Variables::		Variables reserved for the user
+* Auxiliary Programs::          Programs automake might require
+
+
+File: automake1.5.info,  Node: General Operation,  Next: Strictness,  Prev: Generalities,  Up: Generalities
+
+2.1 General Operation
+=====================
+
+Automake works by reading a `Makefile.am' and generating a
+`Makefile.in'.  Certain macros and targets defined in the `Makefile.am'
+instruct Automake to generate more specialized code; for instance, a
+`bin_PROGRAMS' macro definition will cause targets for compiling and
+linking programs to be generated.
+
+   The macro definitions and targets in the `Makefile.am' are copied
+verbatim into the generated file.  This allows you to add arbitrary code
+into the generated `Makefile.in'.  For instance the Automake
+distribution includes a non-standard `cvs-dist' target, which the
+Automake maintainer uses to make distributions from his source control
+system.
+
+   Note that GNU make extensions are not recognized by Automake.  Using
+such extensions in a `Makefile.am' will lead to errors or confusing
+behavior.
+
+   Automake tries to group comments with adjoining targets and macro
+definitions in an intelligent way.
+
+   A target defined in `Makefile.am' generally overrides any such
+target of a similar name that would be automatically generated by
+`automake'.  Although this is a supported feature, it is generally best
+to avoid making use of it, as sometimes the generated rules are very
+particular.
+
+   Similarly, a macro defined in `Makefile.am' will override any
+definition of the macro that `automake' would ordinarily create.  This
+feature is more often useful than the ability to override a target
+definition.  Be warned that many of the macros generated by `automake'
+are considered to be for internal use only, and their names might
+change in future releases.
+
+   When examining a macro definition, Automake will recursively examine
+macros referenced in the definition.  For example, if Automake is
+looking at the content of `foo_SOURCES' in this snippet
+
+     xs = a.c b.c
+     foo_SOURCES = c.c $(xs)
+
+   it would use the files `a.c', `b.c', and `c.c' as the contents of
+`foo_SOURCES'.
+
+   Automake also allows a form of comment which is _not_ copied into
+the output; all lines beginning with `##' (leading spaces allowed) are
+completely ignored by Automake.
+
+   It is customary to make the first line of `Makefile.am' read:
+
+     ## Process this file with automake to produce Makefile.in
+
+
+File: automake1.5.info,  Node: Strictness,  Next: Uniform,  Prev: General Operation,  Up: Generalities
+
+2.2 Strictness
+==============
+
+While Automake is intended to be used by maintainers of GNU packages, it
+does make some effort to accommodate those who wish to use it, but do
+not want to use all the GNU conventions.
+
+   To this end, Automake supports three levels of "strictness"--the
+strictness indicating how stringently Automake should check standards
+conformance.
+
+   The valid strictness levels are:
+
+`foreign'
+     Automake will check for only those things which are absolutely
+     required for proper operations.  For instance, whereas GNU
+     standards dictate the existence of a `NEWS' file, it will not be
+     required in this mode.  The name comes from the fact that Automake
+     is intended to be used for GNU programs; these relaxed rules are
+     not the standard mode of operation.
+
+`gnu'
+     Automake will check--as much as possible--for compliance to the GNU
+     standards for packages.  This is the default.
+
+`gnits'
+     Automake will check for compliance to the as-yet-unwritten "Gnits
+     standards".  These are based on the GNU standards, but are even
+     more detailed.  Unless you are a Gnits standards contributor, it is
+     recommended that you avoid this option until such time as the Gnits
+     standard is actually published (which may never happen).
+
+   For more information on the precise implications of the strictness
+level, see *Note Gnits::.
+
+   Automake also has a special "cygnus" mode which is similar to
+strictness but handled differently.  This mode is useful for packages
+which are put into a "Cygnus" style tree (e.g., the GCC tree).  For
+more information on this mode, see *Note Cygnus::.
+
+
+File: automake1.5.info,  Node: Uniform,  Next: Canonicalization,  Prev: Strictness,  Up: Generalities
+
+2.3 The Uniform Naming Scheme
+=============================
+
+Automake macros (from here on referred to as _variables_) generally
+follow a "uniform naming scheme" that makes it easy to decide how
+programs (and other derived objects) are built, and how they are
+installed.  This scheme also supports `configure' time determination of
+what should be built.
+
+   At `make' time, certain variables are used to determine which
+objects are to be built.  The variable names are made of several pieces
+which are concatenated together.
+
+   The piece which tells automake what is being built is commonly called
+the "primary".  For instance, the primary `PROGRAMS' holds a list of
+programs which are to be compiled and linked.  
+
+   A different set of names is used to decide where the built objects
+should be installed.  These names are prefixes to the primary which
+indicate which standard directory should be used as the installation
+directory.  The standard directory names are given in the GNU standards
+(*note Directory Variables: (standards)Directory Variables.).  Automake
+extends this list with `pkglibdir', `pkgincludedir', and `pkgdatadir';
+these are the same as the non-`pkg' versions, but with `@PACKAGE@'
+appended.  For instance, `pkglibdir' is defined as
+`$(libdir)/@PACKAGE@'.  
+
+   For each primary, there is one additional variable named by
+prepending `EXTRA_' to the primary name.  This variable is used to list
+objects which may or may not be built, depending on what `configure'
+decides.  This variable is required because Automake must statically
+know the entire list of objects that may be built in order to generate
+a `Makefile.in' that will work in all cases.
+
+   For instance, `cpio' decides at configure time which programs are
+built.  Some of the programs are installed in `bindir', and some are
+installed in `sbindir':
+
+     EXTRA_PROGRAMS = mt rmt
+     bin_PROGRAMS = cpio pax
+     sbin_PROGRAMS = @MORE_PROGRAMS@
+
+   Defining a primary without a prefix as a variable, e.g., `PROGRAMS',
+is an error.
+
+   Note that the common `dir' suffix is left off when constructing the
+variable names; thus one writes `bin_PROGRAMS' and not
+`bindir_PROGRAMS'.
+
+   Not every sort of object can be installed in every directory.
+Automake will flag those attempts it finds in error.  Automake will
+also diagnose obvious misspellings in directory names.
+
+   Sometimes the standard directories--even as augmented by Automake--
+are not enough.  In particular it is sometimes useful, for clarity, to
+install objects in a subdirectory of some predefined directory.  To this
+end, Automake allows you to extend the list of possible installation
+directories.  A given prefix (e.g. `zar') is valid if a variable of the
+same name with `dir' appended is defined (e.g. `zardir').
+
+   For instance, until HTML support is part of Automake, you could use
+this to install raw HTML documentation:
+
+     htmldir = $(prefix)/html
+     html_DATA = automake.html
+
+   The special prefix `noinst' indicates that the objects in question
+should not be installed at all.
+
+   The special prefix `check' indicates that the objects in question
+should not be built until the `make check' command is run.
+
+   The current primary names are `PROGRAMS', `LIBRARIES', `LISP',
+`PYTHON', `JAVA', `SCRIPTS', `DATA', `HEADERS', `MANS', and `TEXINFOS'.  
+
+   Some primaries also allow additional prefixes which control other
+aspects of `automake''s behavior.  The currently defined prefixes are
+`dist_', `nodist_', and `nobase_'.  These prefixes are explained later.
+
+
+File: automake1.5.info,  Node: Canonicalization,  Next: User Variables,  Prev: Uniform,  Up: Generalities
+
+2.4 How derived variables are named
+===================================
+
+Sometimes a Makefile variable name is derived from some text the
+maintainer supplies.  For instance, a program name listed in
+`_PROGRAMS' is rewritten into the name of a `_SOURCES' variable.  In
+cases like this, Automake canonicalizes the text, so that program names
+and the like do not have to follow Makefile macro naming rules.  All
+characters in the name except for letters, numbers, the strudel (@),
+and the underscore are turned into underscores when making macro
+references.
+
+   For example, if your program is named `sniff-glue', the derived
+variable name would be `sniff_glue_SOURCES', not `sniff-glue_SOURCES'.
+
+   The strudel is an addition, to make the use of Autoconf
+substitutions in macro names less obfuscating.
+
+
+File: automake1.5.info,  Node: User Variables,  Next: Auxiliary Programs,  Prev: Canonicalization,  Up: Generalities
+
+2.5 Variables reserved for the user
+===================================
+
+Some `Makefile' variables are reserved by the GNU Coding Standards for
+the use of the "user" - the person building the package.  For instance,
+`CFLAGS' is one such variable.
+
+   Sometimes package developers are tempted to set user variables such
+as `CFLAGS' because it appears to make their job easier - they don't
+have to introduce a second variable into every target.
+
+   However, the package itself should never set a user variable,
+particularly not to include switches which are required for proper
+compilation of the package.  Since these variables are documented as
+being for the package builder, that person rightfully expects to be able
+to override any of these variables at build time.
+
+   To get around this problem, automake introduces an automake-specific
+shadow variable for each user flag variable.  (Shadow variables are not
+introduced for variables like `CC', where they would make no sense.)
+The shadow variable is named by prepending `AM_' to the user variable's
+name.  For instance, the shadow variable for `YFLAGS' is `AM_YFLAGS'.
+
+
+File: automake1.5.info,  Node: Auxiliary Programs,  Prev: User Variables,  Up: Generalities
+
+2.6 Programs automake might require
+===================================
+
+Automake sometimes requires helper programs so that the generated
+`Makefile' can do its work properly.  There are a fairly large number
+of them, and we list them here.
+
+`ansi2knr.c'
+`ansi2knr.1'
+     These two files are used by the automatic de-ANSI-fication support
+     (*note ANSI::).
+
+`compile'
+     This is a wrapper for compilers which don't accept both `-c' and
+     `-o' at the same time.  It is only used when absolutely required.
+     Such compilers are rare.
+
+`config.guess'
+`config.sub'
+     These programs compute the canonical triplets for the given build,
+     host, or target architecture.
+
+`depcomp'
+     This program understands how to run a compiler so that it will
+     generate not only the desired output but also dependency
+     information which is then used by the automatic dependency
+     tracking feature.
+
+`elisp-comp'
+     This program is used to byte-compile Emacs Lisp code.
+
+`install-sh'
+     This is a replacement for the `install' program which works on
+     platforms where `install' is unavailable or unusable.
+
+`mdate-sh'
+     This script is used to generate a `version.texi' file.  It examines
+     a file and prints some date information about it.
+
+`missing'
+     This wraps a number of programs which are typically only required
+     by maintainers.  If the program in question doesn't exist,
+     `missing' prints an informative warning and attempts to fix things
+     so that the build can continue.
+
+`mkinstalldirs'
+     This works around the fact that `mkdir -p' is not portable.
+
+`py-compile'
+     This is used to byte-compile Python scripts.
+
+`texinfo.tex'
+     Not a program, this file is required for `make dvi' to work when
+     Texinfo sources are in the package.
+
+`ylwrap'
+     This program wraps `lex' and `yacc' and ensures that, for
+     instance, multiple `yacc' instances can be invoked in a single
+     directory in parallel.
+
+
+
+File: automake1.5.info,  Node: Examples,  Next: Invoking Automake,  Prev: Generalities,  Up: Top
+
+3 Some example packages
+***********************
+
+* Menu:
+
+* Complete::                    A simple example, start to finish
+* Hello::                       A classic program
+* etags::                       Building etags and ctags
+
+
+File: automake1.5.info,  Node: Complete,  Next: Hello,  Prev: Examples,  Up: Examples
+
+3.1 A simple example, start to finish
+=====================================
+
+Let's suppose you just finished writing `zardoz', a program to make
+your head float from vortex to vortex.  You've been using Autoconf to
+provide a portability framework, but your `Makefile.in's have been
+ad-hoc.  You want to make them bulletproof, so you turn to Automake.
+
+   The first step is to update your `configure.in' to include the
+commands that `automake' needs.  The way to do this is to add an
+`AM_INIT_AUTOMAKE' call just after `AC_INIT':
+
+     AM_INIT_AUTOMAKE(zardoz, 1.0)
+
+   Since your program doesn't have any complicating factors (e.g., it
+doesn't use `gettext', it doesn't want to build a shared library),
+you're done with this part.  That was easy!
+
+   Now you must regenerate `configure'.  But to do that, you'll need to
+tell `autoconf' how to find the new macro you've used.  The easiest way
+to do this is to use the `aclocal' program to generate your
+`aclocal.m4' for you.  But wait... you already have an `aclocal.m4',
+because you had to write some hairy macros for your program.  The
+`aclocal' program lets you put your own macros into `acinclude.m4', so
+simply rename and then run:
+
+     mv aclocal.m4 acinclude.m4
+     aclocal
+     autoconf
+
+   Now it is time to write your `Makefile.am' for `zardoz'.  Since
+`zardoz' is a user program, you want to install it where the rest of
+the user programs go.  Additionally, `zardoz' has some Texinfo
+documentation.  Your `configure.in' script uses `AC_REPLACE_FUNCS', so
+you need to link against `@LIBOBJS@'.  So here's what you'd write:
+
+     bin_PROGRAMS = zardoz
+     zardoz_SOURCES = main.c head.c float.c vortex9.c gun.c
+     zardoz_LDADD = @LIBOBJS@
+
+     info_TEXINFOS = zardoz.texi
+
+   Now you can run `automake --add-missing' to generate your
+`Makefile.in' and grab any auxiliary files you might need, and you're
+done!
+
+
+File: automake1.5.info,  Node: Hello,  Next: etags,  Prev: Complete,  Up: Examples
+
+3.2 A classic program
+=====================
+
+GNU hello (ftp://prep.ai.mit.edu/pub/gnu/hello-1.3.tar.gz) is renowned
+for its classic simplicity and versatility.  This section shows how
+Automake could be used with the GNU Hello package.  The examples below
+are from the latest beta version of GNU Hello, but with all of the
+maintainer-only code stripped out, as well as all copyright comments.
+
+   Of course, GNU Hello is somewhat more featureful than your
+traditional two-liner.  GNU Hello is internationalized, does option
+processing, and has a manual and a test suite.
+
+   Here is the `configure.in' from GNU Hello:
+
+     dnl Process this file with autoconf to produce a configure script.
+     AC_INIT(src/hello.c)
+     AM_INIT_AUTOMAKE(hello, 1.3.11)
+     AM_CONFIG_HEADER(config.h)
+
+     dnl Set of available languages.
+     ALL_LINGUAS="de fr es ko nl no pl pt sl sv"
+
+     dnl Checks for programs.
+     AC_PROG_CC
+     AC_ISC_POSIX
+
+     dnl Checks for libraries.
+
+     dnl Checks for header files.
+     AC_STDC_HEADERS
+     AC_HAVE_HEADERS(string.h fcntl.h sys/file.h sys/param.h)
+
+     dnl Checks for library functions.
+     AC_FUNC_ALLOCA
+
+     dnl Check for st_blksize in struct stat
+     AC_ST_BLKSIZE
+
+     dnl internationalization macros
+     AM_GNU_GETTEXT
+     AC_OUTPUT([Makefile doc/Makefile intl/Makefile po/Makefile.in \
+                src/Makefile tests/Makefile tests/hello],
+        [chmod +x tests/hello])
+
+   The `AM_' macros are provided by Automake (or the Gettext library);
+the rest are standard Autoconf macros.
+
+   The top-level `Makefile.am':
+
+     EXTRA_DIST = BUGS ChangeLog.O
+     SUBDIRS = doc intl po src tests
+
+   As you can see, all the work here is really done in subdirectories.
+
+   The `po' and `intl' directories are automatically generated using
+`gettextize'; they will not be discussed here.
+
+   In `doc/Makefile.am' we see:
+
+     info_TEXINFOS = hello.texi
+     hello_TEXINFOS = gpl.texi
+
+   This is sufficient to build, install, and distribute the GNU Hello
+manual.
+
+   Here is `tests/Makefile.am':
+
+     TESTS = hello
+     EXTRA_DIST = hello.in testdata
+
+   The script `hello' is generated by `configure', and is the only test
+case.  `make check' will run this test.
+
+   Last we have `src/Makefile.am', where all the real work is done:
+
+     bin_PROGRAMS = hello
+     hello_SOURCES = hello.c version.c getopt.c getopt1.c getopt.h system.h
+     hello_LDADD = @INTLLIBS@ @ALLOCA@
+     localedir = $(datadir)/locale
+     INCLUDES = -I../intl -DLOCALEDIR=\"$(localedir)\"
+
+
+File: automake1.5.info,  Node: etags,  Prev: Hello,  Up: Examples
+
+3.3 Building etags and ctags
+============================
+
+Here is another, trickier example.  It shows how to generate two
+programs (`ctags' and `etags') from the same source file (`etags.c').
+The difficult part is that each compilation of `etags.c' requires
+different `cpp' flags.
+
+     bin_PROGRAMS = etags ctags
+     ctags_SOURCES =
+     ctags_LDADD = ctags.o
+
+     etags.o: etags.c
+             $(COMPILE) -DETAGS_REGEXPS -c etags.c
+
+     ctags.o: etags.c
+             $(COMPILE) -DCTAGS -o ctags.o -c etags.c
+
+   Note that `ctags_SOURCES' is defined to be empty--that way no
+implicit value is substituted.  The implicit value, however, is used to
+generate `etags' from `etags.o'.
+
+   `ctags_LDADD' is used to get `ctags.o' into the link line.
+`ctags_DEPENDENCIES' is generated by Automake.
+
+   The above rules won't work if your compiler doesn't accept both `-c'
+and `-o'.  The simplest fix for this is to introduce a bogus dependency
+(to avoid problems with a parallel `make'):
+
+     etags.o: etags.c ctags.o
+             $(COMPILE) -DETAGS_REGEXPS -c etags.c
+
+     ctags.o: etags.c
+             $(COMPILE) -DCTAGS -c etags.c && mv etags.o ctags.o
+
+   Also, these explicit rules do not work if the de-ANSI-fication
+feature is used (*note ANSI::).  Supporting de-ANSI-fication requires a
+little more work:
+
+     etags._o: etags._c ctags.o
+             $(COMPILE) -DETAGS_REGEXPS -c etags.c
+
+     ctags._o: etags._c
+             $(COMPILE) -DCTAGS -c etags.c && mv etags._o ctags.o
+
+   As it turns out, there is also a much easier way to do this same
+task.  Some of the above techniques are useful enough that we've kept
+the example in the manual.  However if you were to build `etags' and
+`ctags' in real life, you would probably use per-program compilation
+flags, like so:
+
+     bin_PROGRAMS = ctags etags
+
+     ctags_SOURCES = etags.c
+     ctags_CFLAGS = -DCTAGS
+
+     etags_SOURCES = etags.c
+     etags_CFLAGS = -DETAGS_REGEXPS
+
+   In this case Automake will cause `etags.c' to be compiled twice,
+with different flags.  De-ANSI-fication will work automatically.  In
+this instance, the names of the object files would be chosen by
+automake; they would be `ctags-etags.c' and `etags-etags.o'.  (The name
+of the object files rarely matters.)
+
+
+File: automake1.5.info,  Node: Invoking Automake,  Next: configure,  Prev: Examples,  Up: Top
+
+4 Creating a `Makefile.in'
+**************************
+
+To create all the `Makefile.in's for a package, run the `automake'
+program in the top level directory, with no arguments.  `automake' will
+automatically find each appropriate `Makefile.am' (by scanning
+`configure.in'; *note configure::) and generate the corresponding
+`Makefile.in'.  Note that `automake' has a rather simplistic view of
+what constitutes a package; it assumes that a package has only one
+`configure.in', at the top.  If your package has multiple
+`configure.in's, then you must run `automake' in each directory holding
+a `configure.in'.
+
+   You can optionally give `automake' an argument; `.am' is appended to
+the argument and the result is used as the name of the input file.
+This feature is generally only used to automatically rebuild an
+out-of-date `Makefile.in'.  Note that `automake' must always be run
+from the topmost directory of a project, even if being used to
+regenerate the `Makefile.in' in some subdirectory.  This is necessary
+because `automake' must scan `configure.in', and because `automake'
+uses the knowledge that a `Makefile.in' is in a subdirectory to change
+its behavior in some cases.
+
+   `automake' accepts the following options:
+
+`-a'
+`--add-missing'
+     Automake requires certain common files to exist in certain
+     situations; for instance `config.guess' is required if
+     `configure.in' runs `AC_CANONICAL_HOST'.  Automake is distributed
+     with several of these files; this option will cause the missing
+     ones to be automatically added to the package, whenever possible.
+     In general if Automake tells you a file is missing, try using this
+     option.  By default Automake tries to make a symbolic link
+     pointing to its own copy of the missing file; this can be changed
+     with `--copy'.
+
+`--libdir=DIR'
+     Look for Automake data files in directory DIR instead of in the
+     installation directory.  This is typically used for debugging.
+
+`-c'
+`--copy'
+     When used with `--add-missing', causes installed files to be
+     copied.  The default is to make a symbolic link.
+
+`--cygnus'
+     Causes the generated `Makefile.in's to follow Cygnus rules, instead
+     of GNU or Gnits rules.  For more information, see *Note Cygnus::.
+
+`-f'
+`--force-missing'
+     When used with `--add-missing', causes standard files to be rebuilt
+     even if they already exist in the source tree.  This involves
+     removing the file from the source tree before creating the new
+     symlink (or, with `--copy', copying the new file).
+
+`--foreign'
+     Set the global strictness to `foreign'.  For more information, see
+     *Note Strictness::.
+
+`--gnits'
+     Set the global strictness to `gnits'.  For more information, see
+     *Note Gnits::.
+
+`--gnu'
+     Set the global strictness to `gnu'.  For more information, see
+     *Note Gnits::.  This is the default strictness.
+
+`--help'
+     Print a summary of the command line options and exit.
+
+`-i'
+`--ignore-deps'
+     This disables the dependency tracking feature; see *Note
+     Dependencies::.
+
+`--include-deps'
+     This enables the dependency tracking feature.  This feature is
+     enabled by default.  This option is provided for historical
+     reasons only and probably should not be used.
+
+`--no-force'
+     Ordinarily `automake' creates all `Makefile.in's mentioned in
+     `configure.in'.  This option causes it to only update those
+     `Makefile.in's which are out of date with respect to one of their
+     dependents.
+
+`-o DIR'
+`--output-dir=DIR'
+     Put the generated `Makefile.in' in the directory DIR.  Ordinarily
+     each `Makefile.in' is created in the directory of the
+     corresponding `Makefile.am'.  This option is used when making
+     distributions.
+
+`-v'
+`--verbose'
+     Cause Automake to print information about which files are being
+     read or created.
+
+`--version'
+     Print the version number of Automake and exit.
+
+`--Werror'
+`--Wno-error'
+     `--Werror' will cause all warnings issued by `automake' to become
+     errors.  Errors affect the exit status of `automake', while
+     warnings do not.  `--Wno-error', the default, causes warnings to be
+     treated as warnings only.
+
+
+File: automake1.5.info,  Node: configure,  Next: Top level,  Prev: Invoking Automake,  Up: Top
+
+5 Scanning `configure.in'
+*************************
+
+Automake scans the package's `configure.in' to determine certain
+information about the package.  Some `autoconf' macros are required and
+some variables must be defined in `configure.in'.  Automake will also
+use information from `configure.in' to further tailor its output.
+
+   Automake also supplies some Autoconf macros to make the maintenance
+easier.  These macros can automatically be put into your `aclocal.m4'
+using the `aclocal' program.
+
+* Menu:
+
+* Requirements::                Configuration requirements
+* Optional::                    Other things Automake recognizes
+* Invoking aclocal::            Auto-generating aclocal.m4
+* Macros::                      Autoconf macros supplied with Automake
+* Extending aclocal::           Writing your own aclocal macros
+
+
+File: automake1.5.info,  Node: Requirements,  Next: Optional,  Prev: configure,  Up: configure
+
+5.1 Configuration requirements
+==============================
+
+The one real requirement of Automake is that your `configure.in' call
+`AM_INIT_AUTOMAKE'.  This macro does several things which are required
+for proper Automake operation.  
+
+   Here are the other macros which Automake requires but which are not
+run by `AM_INIT_AUTOMAKE':
+
+`AC_OUTPUT'
+     Automake uses this to determine which files to create (*note
+     Creating Output Files: (autoconf)Output.).  Listed files named
+     `Makefile' are treated as `Makefile's.  Other listed files are
+     treated differently.  Currently the only difference is that a
+     `Makefile' is removed by `make distclean', while other files are
+     removed by `make clean'.  
+
+   You may need the following macros in some conditions, even though
+they are not required.
+
+`AC_CHECK_TOOL([STRIP],[strip])'
+     Installed binaries are usually stripped using `strip' when you run
+     `make install-strip'.  However `strip' might not be the right tool
+     to use in cross-compilation environments, therefore Automake will
+     honor the `STRIP' environment variable to overrule the program
+     used to perform stripping.  Automake will not set `STRIP' itself.
+     If your package is not setup for cross-compilation you do not have
+     to care (`strip' is ok), otherwise you can set `STRIP'
+     automatically by calling `AC_CHECK_TOOL([STRIP],[strip])' from
+     your `configure.in'.
+
+
+File: automake1.5.info,  Node: Optional,  Next: Invoking aclocal,  Prev: Requirements,  Up: configure
+
+5.2 Other things Automake recognizes
+====================================
+
+Automake will also recognize the use of certain macros and tailor the
+generated `Makefile.in' appropriately.  Currently recognized macros and
+their effects are:
+
+`AC_CONFIG_HEADER'
+     Automake requires the use of `AM_CONFIG_HEADER', which is similar
+     to `AC_CONFIG_HEADER' (*note Configuration Header Files:
+     (autoconf)Configuration Headers.), but does some useful
+     Automake-specific work.  
+
+`AC_CONFIG_AUX_DIR'
+     Automake will look for various helper scripts, such as
+     `mkinstalldirs', in the directory named in this macro invocation.
+     If not seen, the scripts are looked for in their `standard'
+     locations (either the top source directory, or in the source
+     directory corresponding to the current `Makefile.am', whichever is
+     appropriate).  *Note Finding `configure' Input: (autoconf)Input.  FIXME:
+     give complete list of things looked for in this directory
+
+`AC_PATH_XTRA'
+     Automake will insert definitions for the variables defined by
+     `AC_PATH_XTRA' into each `Makefile.in' that builds a C program or
+     library.  *Note System Services: (autoconf)System Services.  
+
+`AC_CANONICAL_HOST'
+`AC_CHECK_TOOL'
+     Automake will ensure that `config.guess' and `config.sub' exist.
+     Also, the `Makefile' variables `host_alias' and `host_triplet' are
+     introduced.  See both *Note Getting the Canonical System Type:
+     (autoconf)Canonicalizing, and *Note Generic Program Checks:
+     (autoconf)Generic Programs.  
+
+`AC_CANONICAL_SYSTEM'
+     This is similar to `AC_CANONICAL_HOST', but also defines the
+     `Makefile' variables `build_alias' and `target_alias'.  *Note
+     Getting the Canonical System Type: (autoconf)Canonicalizing.  
+
+`AC_FUNC_ALLOCA'
+`AC_FUNC_GETLOADAVG'
+`AC_FUNC_MEMCMP'
+`AC_STRUCT_ST_BLOCKS'
+`AC_FUNC_FNMATCH'
+`AC_FUNC_MKTIME'
+`AM_FUNC_STRTOD'
+`AC_REPLACE_FUNCS'
+`AC_REPLACE_GNU_GETOPT'
+`AM_WITH_REGEX'
+     Automake will ensure that the appropriate dependencies are
+     generated for the objects corresponding to these macros.  Also,
+     Automake will verify that the appropriate source files are part of
+     the distribution.  Note that Automake does not come with any of
+     the C sources required to use these macros, so `automake -a' will
+     not install the sources.  *Note A Library::, for more information.
+     Also, see *Note Particular Function Checks: (autoconf)Particular
+     Functions.  
+
+`LIBOBJS'
+     Automake will detect statements which put `.o' files into
+     `LIBOBJS', and will treat these additional files as if they were
+     discovered via `AC_REPLACE_FUNCS'.  *Note Generic Function Checks:
+     (autoconf)Generic Functions.  
+
+`AC_PROG_RANLIB'
+     This is required if any libraries are built in the package.  *Note
+     Particular Program Checks: (autoconf)Particular Programs.  
+
+`AC_PROG_CXX'
+     This is required if any C++ source is included.  *Note Particular
+     Program Checks: (autoconf)Particular Programs.  
+
+`AC_PROG_F77'
+     This is required if any Fortran 77 source is included.  This macro
+     is distributed with Autoconf version 2.13 and later.  *Note
+     Particular Program Checks: (autoconf)Particular Programs.  
+
+`AC_F77_LIBRARY_LDFLAGS'
+     This is required for programs and shared libraries that are a
+     mixture of languages that include Fortran 77 (*note Mixing Fortran
+     77 With C and C++::).  *Note Autoconf macros supplied with
+     Automake: Macros.  
+
+`AC_PROG_LIBTOOL'
+     Automake will turn on processing for `libtool' (*note
+     Introduction: (libtool)Top.).  
+
+`AC_PROG_YACC'
+     If a Yacc source file is seen, then you must either use this macro
+     or define the variable `YACC' in `configure.in'.  The former is
+     preferred (*note Particular Program Checks: (autoconf)Particular
+     Programs.).  
+
+`AC_DECL_YYTEXT'
+     This macro is required if there is Lex source in the package.
+     *Note Particular Program Checks: (autoconf)Particular Programs.  
+
+`AC_PROG_LEX'
+     If a Lex source file is seen, then this macro must be used.  *Note
+     Particular Program Checks: (autoconf)Particular Programs.  
+
+`AM_C_PROTOTYPES'
+     This is required when using automatic de-ANSI-fication; see *Note
+     ANSI::.  
+
+`AM_GNU_GETTEXT'
+     This macro is required for packages which use GNU gettext (*note
+     gettext::).  It is distributed with gettext.  If Automake sees
+     this macro it ensures that the package meets some of gettext's
+     requirements.  
+
+`AM_MAINTAINER_MODE'
+     This macro adds a `--enable-maintainer-mode' option to
+     `configure'.  If this is used, `automake' will cause
+     `maintainer-only' rules to be turned off by default in the
+     generated `Makefile.in's.  This macro is disallowed in `Gnits'
+     mode (*note Gnits::).  This macro defines the `MAINTAINER_MODE'
+     conditional, which you can use in your own `Makefile.am'.  
+
+`AC_SUBST'
+`AC_CHECK_TOOL'
+`AC_CHECK_PROG'
+`AC_CHECK_PROGS'
+`AC_PATH_PROG'
+`AC_PATH_PROGS'
+     For each of these macros, the first argument is automatically
+     defined as a variable in each generated `Makefile.in'.  *Note
+     Setting Output Variables: (autoconf)Setting Output Variables, and
+     *Note Generic Program Checks: (autoconf)Generic Programs.  
+
+
+
+File: automake1.5.info,  Node: Invoking aclocal,  Next: Macros,  Prev: Optional,  Up: configure
+
+5.3 Auto-generating aclocal.m4
+==============================
+
+Automake includes a number of Autoconf macros which can be used in your
+package; some of them are actually required by Automake in certain
+situations.  These macros must be defined in your `aclocal.m4';
+otherwise they will not be seen by `autoconf'.
+
+   The `aclocal' program will automatically generate `aclocal.m4' files
+based on the contents of `configure.in'.  This provides a convenient
+way to get Automake-provided macros, without having to search around.
+Also, the `aclocal' mechanism is extensible for use by other packages.
+
+   At startup, `aclocal' scans all the `.m4' files it can find, looking
+for macro definitions (*note Macro search path::).  Then it +scans
+`configure.in'.  Any mention of one of the macros found in the first
+step causes that macro, and any macros it in turn requires, to be put
+into `aclocal.m4'.
+
+   The contents of `acinclude.m4', if it exists, are also automatically
+included in `aclocal.m4'.  This is useful for incorporating local
+macros into `configure'.
+
+   `aclocal' tries to be smart about looking for new `AC_DEFUN's in the
+files it scans.  It will warn if it finds duplicates.  It also tries to
+copy the full text of the scanned file into `aclocal.m4', including
+both `#' and `dnl' comments.  If you want to make a comment which will
+be completely ignored by `aclocal', use `##' as the comment leader.
+
+* Menu:
+
+* aclocal options::             Options supported by aclocal
+* Macro search path::           How aclocal finds .m4 files
+
+
+File: automake1.5.info,  Node: aclocal options,  Next: Macro search path,  Prev: Invoking aclocal,  Up: Invoking aclocal
+
+5.4 aclocal options
+===================
+
+`aclocal' accepts the following options:
+
+`--acdir=DIR'
+     Look for the macro files in DIR instead of the installation
+     directory.  This is typically used for debugging.
+
+`--help'
+     Print a summary of the command line options and exit.
+
+`-I DIR'
+     Add the directory DIR to the list of directories searched for
+     `.m4' files.
+
+`--output=FILE'
+     Cause the output to be put into FILE instead of `aclocal.m4'.
+
+`--print-ac-dir'
+     Prints the name of the directory which `aclocal' will search to
+     find the `.m4' files.  When this option is given, normal processing
+     is suppressed.  This option can be used by a package to determine
+     where to install a macro file.
+
+`--verbose'
+     Print the names of the files it examines.
+
+`--version'
+     Print the version number of Automake and exit.
+
+
+File: automake1.5.info,  Node: Macro search path,  Prev: aclocal options,  Up: Invoking aclocal
+
+5.5 Macro search path
+=====================
+
+By default, `aclocal' searches for `.m4' files in the following
+directories, in this order:
+
+`ACDIR-APIVERSION'
+     This is where the `.m4' macros distributed with automake itself
+     are stored.  APIVERSION depends on the automake release used; for
+     automake 1.6.x, APIVERSION = `1.6'.
+
+`ACDIR'
+     This directory is intended for third party `.m4' files, and is
+     configured when `automake' itself is built.  This is
+     `@datadir@/aclocal/', which typically expands to
+     `${prefix}/share/aclocal/'.  To find the compiled-in value of
+     ACDIR, use the `--print-ac-dir' option (*note aclocal options::).
+
+   As an example, suppose that automake-1.6.2 was configured with
+`--prefix=/usr/local'.  Then, the search path would be:
+
+  1. `/usr/local/share/aclocal-1.6/'
+
+  2. `/usr/local/share/aclocal/'
+
+   As explained in (*note aclocal options::), there are several options
+that can be used to change or extend this search path.
+
+5.5.1 Modifying the macro search path: `--acdir'
+------------------------------------------------
+
+The most obvious option to modify the search path is `--acdir=DIR',
+which changes default directory and drops the APIVERSION directory.
+For example, if one specifies `--acdir=/opt/private/', then the search
+path becomes:
+
+  1. `/opt/private/'
+
+   Note that this option, `--acdir', is intended for use by the
+internal automake test suite only; it is not ordinarily needed by
+end-users.
+
+5.5.2 Modifying the macro search path: `-I DIR'
+-----------------------------------------------
+
+Any extra directories specified using `-I' options (*note aclocal
+options::) are _prepended_ to this search list.  Thus, `aclocal -I /foo
+-I /bar' results in the following search path:
+
+  1. `/foo'
+
+  2. `/bar'
+
+  3. ACDIR-APIVERSION
+
+  4. ACDIR
+
+5.5.3 Modifying the macro search path: `dirlist'
+------------------------------------------------
+
+There is a third mechanism for customizing the search path.  If a
+`dirlist' file exists in ACDIR, then that file is assumed to contain a
+list of directories, one per line, to be added to the search list.
+These directories are searched _after_ any directories specified on the
+command line using `-I', but _before_ the ACDIR and ACDIR-APIVERSION
+directories.
+
+   For example, suppose `ACDIR/dirlist' contains the following:
+
+     /test1
+     /test2
+
+   and that `aclocal' was called with the `-I /foo -I /bar' options.
+Then, the search path would be
+
+  1. `/foo'
+
+  2. `/bar'
+
+  3. `/test1'
+
+  4. `/test2'
+
+  5. ACDIR-APIVERSION
+
+  6. ACDIR
+
+   If the `--acdir=DIR' option is used, then `aclocal' will search for
+the `dirlist' file in the _redirected_ ACDIR directory.  In the
+`--acdir' example above, `aclocal' will search the `/opt/private/'
+directory for `dirlist'.  Again, however, the `--acdir' option is
+intended for use by the internal automake test suite only; `--acdir' is
+not ordinarily needed by end-users.
+
+   `dirlist' is useful in the following situation: suppose that
+`automake' version `1.6.2' is installed with $prefix=/usr by the system
+vendor. Thus, the default search directories are
+
+  1. `/usr/share/aclocal-1.6/'
+
+  2. `/usr/share/aclocal/'
+
+   However, suppose further that many packages have been manually
+installed on the system, with $prefix=/usr/local, as is typical.  In
+that case, many of these "extra" `.m4' files are in
+`/usr/local/share/aclocal'.  The only way to force `/usr/bin/aclocal'
+to find these "extra" `.m4' files is to always call `aclocal -I
+/usr/local/share/aclocal'.  This is inconvenient.  With `dirlist', one
+may create the file
+
+   `/usr/share/aclocal/dirlist'
+
+   which contains only the single line
+
+   `/usr/local/share/aclocal'
+
+   Now, the "default" search path on the affected system is
+
+  1. `/usr/local/share/aclocal/'
+
+  2. `/usr/share/aclocal-1.6/'
+
+  3. `/usr/share/aclocal/'
+
+   without the need for `-I' options; `-I' options can be reserved for
+project-specific needs (`my-source-dir/m4/'), rather than using it to
+work around local system-dependent tool installation directories.
+
+
+File: automake1.5.info,  Node: Macros,  Next: Extending aclocal,  Prev: Invoking aclocal,  Up: configure
+
+5.6 Autoconf macros supplied with Automake
+==========================================
+
+`AM_CONFIG_HEADER'
+     Automake will generate rules to automatically regenerate the config
+     header.  If you do use this macro, you must create the file
+     `stamp-h.in' in your source directory.  It can be empty.  
+
+`AM_ENABLE_MULTILIB'
+     This is used when a "multilib" library is being built.  The first
+     optional argument is the name of the `Makefile' being generated; it
+     defaults to `Makefile'.  The second option argument is used to find
+     the top source directory; it defaults to the empty string
+     (generally this should not be used unless you are familiar with
+     the internals).  *Note Multilibs::.
+
+`_AM_DEPENDENCIES'
+`AM_SET_DEPDIR'
+`AM_DEP_TRACK'
+`AM_OUTPUT_DEPENDENCY_COMMANDS'
+     These macros are used to implement automake's automatic dependency
+     tracking scheme.  They are called automatically by automake when
+     required, and there should be no need to invoke them manually.
+
+`AM_FUNC_STRTOD'
+     If the `strtod' function is not available, or does not work
+     correctly (like the one on SunOS 5.4), add `strtod.o' to output
+     variable `LIBOBJS'.  
+
+`AM_FUNC_ERROR_AT_LINE'
+     If the function `error_at_line' is not found, then add `error.o'
+     to `LIBOBJS'.  
+
+`AM_FUNC_OBSTACK'
+     Check for the GNU obstacks code; if not found, add `obstack.o' to
+     `LIBOBJS'.  
+
+`AM_C_PROTOTYPES'
+     Check to see if function prototypes are understood by the
+     compiler.  If so, define `PROTOTYPES' and set the output variables
+     `U' and `ANSI2KNR' to the empty string.  Otherwise, set `U' to `_'
+     and `ANSI2KNR' to `./ansi2knr'.  Automake uses these values to
+     implement automatic de-ANSI-fication.  
+
+`AM_HEADER_TIOCGWINSZ_NEEDS_SYS_IOCTL'
+     If the use of `TIOCGWINSZ' requires `<sys/ioctl.h>', then define
+     `GWINSZ_IN_SYS_IOCTL'.  Otherwise `TIOCGWINSZ' can be found in
+     `<termios.h>'.  
+
+`AM_INIT_AUTOMAKE'
+     Runs many macros that most `configure.in''s need.  This macro has
+     two required arguments, the package and the version number.  By
+     default this macro `AC_DEFINE''s `PACKAGE' and `VERSION'.  This
+     can be avoided by passing in a non-empty third argument.
+
+`AM_MAKE_INCLUDE'
+     This macro is used to discover how the user's `make' handles
+     `include' statements.  This macro is automatically invoked when
+     needed; there should be no need to invoke it manually.
+
+`AM_PATH_LISPDIR'
+     Searches for the program `emacs', and, if found, sets the output
+     variable `lispdir' to the full path to Emacs' site-lisp directory.  
+
+`AM_PROG_AS'
+     Use this macro when you have assembly code in your project.  This
+     will choose the assembler for you (by default the C compiler), and
+     will set `ASFLAGS' if required.
+
+`AM_PROG_CC_C_O'
+     This is like `AC_PROG_CC_C_O', but it generates its results in the
+     manner required by automake.  You must use this instead of
+     `AC_PROG_CC_C_O' when you need this functionality.
+
+`AM_PROG_CC_STDC'
+     If the C compiler in not in ANSI C mode by default, try to add an
+     option to output variable `CC' to make it so.  This macro tries
+     various options that select ANSI C on some system or another.  It
+     considers the compiler to be in ANSI C mode if it handles function
+     prototypes correctly.
+
+     If you use this macro, you should check after calling it whether
+     the C compiler has been set to accept ANSI C; if not, the shell
+     variable `am_cv_prog_cc_stdc' is set to `no'.  If you wrote your
+     source code in ANSI C, you can make an un-ANSIfied copy of it by
+     using the `ansi2knr' option (*note ANSI::).
+
+`AM_PROG_LEX'
+     Like `AC_PROG_LEX' with `AC_DECL_YYTEXT' (*note Particular Program
+     Checks: (autoconf)Particular Programs.), but uses the `missing'
+     script on systems that do not have `lex'.  `HP-UX 10' is one such
+     system.
+
+     Autoconf 2.50 and higher, in order to simplify the interface,
+     includes the body of `AC_DECL_YYTEXT' in `AC_PROG_LEX'.  To ensure
+     backward compatibility, `AC_DECL_YYTEXT' is nevertheless defined as
+     an invocation of `AC_PROG_LEX'.  Since `AM_PROG_LEX' invokes both,
+     it causes an annoying but benign warning (`AC_PROG_LEX' invoked
+     multiple times) which you should just ignore.  In the future, once
+     Automake requires Autoconf 2.50, this issue will be fixed, but the
+     current compatibility with Autoconf 2.13 prevents this.
+
+`AM_PROG_GCJ'
+     This macro finds the `gcj' program or causes an error.  It sets
+     `GCJ' and `GCJFLAGS'.  `gcj' is the Java front-end to the GNU
+     Compiler Collection.  
+
+`AM_PROG_INSTALL_STRIP'
+     This is used to find a version of `install' which can be used to
+     `strip' a program at installation time.  This macro is
+     automatically included when required.
+
+`AM_SANITY_CHECK'
+     This checks to make sure that a file created in the build
+     directory is newer than a file in the source directory.  This can
+     fail on systems where the clock is set incorrectly.  This macro is
+     automatically run from `AM_INIT_AUTOMAKE'.
+
+`AM_SYS_POSIX_TERMIOS'
+     Check to see if POSIX termios headers and functions are available
+     on the system.  If so, set the shell variable
+     `am_cv_sys_posix_termios' to `yes'.  If not, set the variable to
+     `no'.
+
+`AM_TYPE_PTRDIFF_T'
+     Define `HAVE_PTRDIFF_T' if the type `ptrdiff_t' is defined in
+     `<stddef.h>'.
+
+`AM_WITH_DMALLOC'
+     Add support for the dmalloc
+     (ftp://ftp.letters.com/src/dmalloc/dmalloc.tar.gz) package.  If
+     the user configures with `--with-dmalloc', then define
+     `WITH_DMALLOC' and add `-ldmalloc' to `LIBS'.
+
+`AM_WITH_REGEX'
+     Adds `--with-regex' to the `configure' command line.  If specified
+     (the default), then the `regex' regular expression library is
+     used, `regex.o' is put into `LIBOBJS', and `WITH_REGEX' is
+     defined..  If `--without-regex' is given, then the `rx' regular
+     expression library is used, and `rx.o' is put into `LIBOBJS'.
+
+
+
+File: automake1.5.info,  Node: Extending aclocal,  Prev: Macros,  Up: configure
+
+5.7 Writing your own aclocal macros
+===================================
+
+The `aclocal' program doesn't have any built-in knowledge of any
+macros, so it is easy to extend it with your own macros.
+
+   This is mostly used for libraries which want to supply their own
+Autoconf macros for use by other programs.  For instance the `gettext'
+library supplies a macro `AM_GNU_GETTEXT' which should be used by any
+package using `gettext'.  When the library is installed, it installs
+this macro so that `aclocal' will find it.
+
+   A file of macros should be a series of `AC_DEFUN''s.  The `aclocal'
+programs also understands `AC_REQUIRE', so it is safe to put each macro
+in a separate file.  *Note Prerequisite Macros: (autoconf)Prerequisite
+Macros, and *Note Macro Definitions: (autoconf)Macro Definitions.
+
+   A macro file's name should end in `.m4'.  Such files should be
+installed in `$(datadir)/aclocal'.
+
+
+File: automake1.5.info,  Node: Top level,  Next: Alternative,  Prev: configure,  Up: Top
+
+6 The top-level `Makefile.am'
+*****************************
+
+In packages with subdirectories, the top level `Makefile.am' must tell
+Automake which subdirectories are to be built.  This is done via the
+`SUBDIRS' variable.  
+
+   The `SUBDIRS' macro holds a list of subdirectories in which building
+of various sorts can occur.  Many targets (e.g. `all') in the generated
+`Makefile' will run both locally and in all specified subdirectories.
+Note that the directories listed in `SUBDIRS' are not required to
+contain `Makefile.am's; only `Makefile's (after configuration).  This
+allows inclusion of libraries from packages which do not use Automake
+(such as `gettext').  The directories mentioned in `SUBDIRS' must be
+direct children of the current directory.  For instance, you cannot put
+`src/subdir' into `SUBDIRS'.
+
+   In packages that use subdirectories, the top-level `Makefile.am' is
+often very short.  For instance, here is the `Makefile.am' from the GNU
+Hello distribution:
+
+     EXTRA_DIST = BUGS ChangeLog.O README-alpha
+     SUBDIRS = doc intl po src tests
+
+   It is possible to override the `SUBDIRS' variable if, like in the
+case of GNU `Inetutils', you want to only build a subset of the entire
+package.  In your `Makefile.am' include:
+
+     SUBDIRS = @MY_SUBDIRS@
+
+   Then in your `configure.in' you can specify:
+
+     MY_SUBDIRS="src doc lib po"
+     AC_SUBST(MY_SUBDIRS)
+
+   (Note that we don't use the variable name `SUBDIRS' in our
+`configure.in'; that would cause Automake to believe that every
+`Makefile.in' should recurse into the listed subdirectories.)
+
+   The upshot of this is that Automake is tricked into building the
+package to take the subdirs, but doesn't actually bind that list until
+`configure' is run.
+
+   Although the `SUBDIRS' macro can contain configure substitutions
+(e.g. `@DIRS@'); Automake itself does not actually examine the contents
+of this variable.
+
+   If `SUBDIRS' is defined, then your `configure.in' must include
+`AC_PROG_MAKE_SET'.  When Automake invokes `make' in a subdirectory, it
+uses the value of the `MAKE' variable.  It passes the value of the
+variable `AM_MAKEFLAGS' to the `make' invocation; this can be set in
+`Makefile.am' if there are flags you must always pass to `make'.  
+
+   The use of `SUBDIRS' is not restricted to just the top-level
+`Makefile.am'.  Automake can be used to construct packages of arbitrary
+depth.
+
+   By default, Automake generates `Makefiles' which work depth-first
+(`postfix').  However, it is possible to change this ordering.  You can
+do this by putting `.' into `SUBDIRS'.  For instance, putting `.'
+first will cause a `prefix' ordering of directories.  All `clean'
+targets are run in reverse order of build targets.
+
+   Sometimes, such as when running `make dist', you want all possible
+subdirectories to be examined.  In this case Automake will use
+`DIST_SUBDIRS', instead of `SUBDIRS', to determine where to recurse.
+This variable will also be used when the user runs `distclean' or
+`maintainer-clean'.  It should be set to the full list of
+subdirectories in the project.  If this macro is not set, Automake will
+attempt to set it for you.
+
+
+File: automake1.5.info,  Node: Alternative,  Next: Rebuilding,  Prev: Top level,  Up: Top
+
+7 An Alternative Approach to Subdirectories
+*******************************************
+
+If you've ever read Peter Miller's excellent paper, Recursive Make
+Considered Harmful
+(http://www.pcug.org.au/~millerp/rmch/recu-make-cons-harm.html), the
+preceding section on the use of subdirectories will probably come as
+unwelcome advice.  For those who haven't read the paper, Miller's main
+thesis is that recursive `make' invocations are both slow and
+error-prone.
+
+   Automake provides sufficient cross-directory support (1) to enable
+you to write a single `Makefile.am' for a complex multi-directory
+package.
+
+   By default an installable file specified in a subdirectory will have
+its directory name stripped before installation.  For instance, in this
+example, the header file will be installed as `$(includedir)/stdio.h':
+
+     include_HEADERS = inc/stdio.h
+
+   However, the `nobase_' prefix can be used to circumvent this path
+stripping.  In this example, the header file will be installed as
+`$(includedir)/sys/types.h':
+
+     nobase_include_HEADERS = sys/types.h
+
+   ---------- Footnotes ----------
+
+   (1) We believe.  This work is new and there are probably warts.
+*Note Introduction::, for information on reporting bugs.
+
+
+File: automake1.5.info,  Node: Rebuilding,  Next: Programs,  Prev: Alternative,  Up: Top
+
+8 Rebuilding Makefiles
+**********************
+
+Automake generates rules to automatically rebuild `Makefile's,
+`configure', and other derived files like `Makefile.in'.
+
+   If you are using `AM_MAINTAINER_MODE' in `configure.in', then these
+automatic rebuilding rules are only enabled in maintainer mode.
+
+   Sometimes you need to run `aclocal' with an argument like `-I' to
+tell it where to find `.m4' files.  Since sometimes `make' will
+automatically run `aclocal', you need a way to specify these arguments.
+You can do this by defining `ACLOCAL_AMFLAGS'; this holds arguments
+which are passed verbatim to `aclocal'.  This macro is only useful in
+the top-level `Makefile.am'.  
+
+
+File: automake1.5.info,  Node: Programs,  Next: Other objects,  Prev: Rebuilding,  Up: Top
+
+9 Building Programs and Libraries
+*********************************
+
+A large part of Automake's functionality is dedicated to making it easy
+to build programs and libraries.
+
+* Menu:
+
+* A Program::                   Building a program
+* A Library::                   Building a library
+* A Shared Library::            Building a Libtool library
+* Program and Library Variables::
+				Variables controlling program and
+                                library builds
+* LIBOBJS::                     Special handling for LIBOBJS and ALLOCA
+* Program variables::           Variables used when building a program
+* Yacc and Lex::                Yacc and Lex support
+* C++ Support::
+* Assembly Support::
+* Fortran 77 Support::
+* Java Support::
+* Support for Other Languages::
+* ANSI::                        Automatic de-ANSI-fication
+* Dependencies::                Automatic dependency tracking
+* EXEEXT::			Support for executable extensions
+
+
+File: automake1.5.info,  Node: A Program,  Next: A Library,  Prev: Programs,  Up: Programs
+
+9.1 Building a program
+======================
+
+9.1.1 Introductory blathering
+-----------------------------
+
+In a directory containing source that gets built into a program (as
+opposed to a library), the `PROGRAMS' primary is used.  Programs can be
+installed in `bindir', `sbindir', `libexecdir', `pkglibdir', or not at
+all (`noinst').  They can also be built only for `make check', in which
+case the prefix is `check'.
+
+   For instance:
+
+     bin_PROGRAMS = hello
+
+   In this simple case, the resulting `Makefile.in' will contain code
+to generate a program named `hello'.
+
+   Associated with each program are several assisting variables which
+are named after the program.  These variables are all optional, and have
+reasonable defaults.  Each variable, its use, and default is spelled out
+below; we use the "hello" example throughout.
+
+   The variable `hello_SOURCES' is used to specify which source files
+get built into an executable:
+
+     hello_SOURCES = hello.c version.c getopt.c getopt1.c getopt.h system.h
+
+   This causes each mentioned `.c' file to be compiled into the
+corresponding `.o'.  Then all are linked to produce `hello'.
+
+   If `hello_SOURCES' is not specified, then it defaults to the single
+file `hello.c'; that is, the default is to compile a single C file
+whose base name is the name of the program itself.  (This is a terrible
+default but we are stuck with it for historical reasons.)  
+
+   Multiple programs can be built in a single directory.  Multiple
+programs can share a single source file, which must be listed in each
+`_SOURCES' definition.
+
+   Header files listed in a `_SOURCES' definition will be included in
+the distribution but otherwise ignored.  In case it isn't obvious, you
+should not include the header file generated by `configure' in a
+`_SOURCES' variable; this file should not be distributed.  Lex (`.l')
+and Yacc (`.y') files can also be listed; see *Note Yacc and Lex::.
+
+9.1.2 Conditional compilations
+------------------------------
+
+You can't put a configure substitution (e.g., `@FOO@') into a
+`_SOURCES' variable.  The reason for this is a bit hard to explain, but
+suffice to say that it simply won't work.  Automake will give an error
+if you try to do this.
+
+   Automake must know all the source files that could possibly go into a
+program, even if not all the files are built in every circumstance.
+Any files which are only conditionally built should be listed in the
+appropriate `EXTRA_' variable.  For instance, if `hello-linux.c' were
+conditionally included in `hello', the `Makefile.am' would contain:
+
+     EXTRA_hello_SOURCES = hello-linux.c
+
+   In this case, `hello-linux.o' would be added, via a `configure'
+substitution, to `hello_LDADD' in order to cause it to be built and
+linked in.
+
+   An often simpler way to compile source files conditionally is to use
+Automake conditionals.  For instance, you could use this construct to
+conditionally use `hello-linux.c' or `hello-generic.c' as the basis for
+your program `hello':
+
+     if LINUX
+     hello_SOURCES = hello-linux.c
+     else
+     hello_SOURCES = hello-generic.c
+     endif
+
+   When using conditionals like this you don't need to use the `EXTRA_'
+variable, because Automake will examine the contents of each variable
+to construct the complete list of source files.
+
+   Sometimes it is useful to determine the programs that are to be
+built at configure time.  For instance, GNU `cpio' only builds `mt' and
+`rmt' under special circumstances.
+
+   In this case, you must notify Automake of all the programs that can
+possibly be built, but at the same time cause the generated
+`Makefile.in' to use the programs specified by `configure'.  This is
+done by having `configure' substitute values into each `_PROGRAMS'
+definition, while listing all optionally built programs in
+`EXTRA_PROGRAMS'.  
+
+   Of course you can use Automake conditionals to determine the
+programs to be built.
+
+9.1.3 Linking the program
+-------------------------
+
+If you need to link against libraries that are not found by
+`configure', you can use `LDADD' to do so.  This variable actually can
+be used to add any options to the linker command line.  
+
+   Sometimes, multiple programs are built in one directory but do not
+share the same link-time requirements.  In this case, you can use the
+`PROG_LDADD' variable (where PROG is the name of the program as it
+appears in some `_PROGRAMS' variable, and usually written in lowercase)
+to override the global `LDADD'.  If this variable exists for a given
+program, then that program is not linked using `LDADD'.  
+
+   For instance, in GNU cpio, `pax', `cpio' and `mt' are linked against
+the library `libcpio.a'.  However, `rmt' is built in the same
+directory, and has no such link requirement.  Also, `mt' and `rmt' are
+only built on certain architectures.  Here is what cpio's
+`src/Makefile.am' looks like (abridged):
+
+     bin_PROGRAMS = cpio pax @MT@
+     libexec_PROGRAMS = @RMT@
+     EXTRA_PROGRAMS = mt rmt
+
+     LDADD = ../lib/libcpio.a @INTLLIBS@
+     rmt_LDADD =
+
+     cpio_SOURCES = ...
+     pax_SOURCES = ...
+     mt_SOURCES = ...
+     rmt_SOURCES = ...
+
+   `PROG_LDADD' is inappropriate for passing program-specific linker
+flags (except for `-l', `-L', `-dlopen' and `-dlpreopen').  So, use the
+`PROG_LDFLAGS' variable for this purpose.  
+
+   It is also occasionally useful to have a program depend on some other
+target which is not actually part of that program.  This can be done
+using the `PROG_DEPENDENCIES' variable.  Each program depends on the
+contents of such a variable, but no further interpretation is done.
+
+   If `PROG_DEPENDENCIES' is not supplied, it is computed by Automake.
+The automatically-assigned value is the contents of `PROG_LDADD', with
+most configure substitutions, `-l', `-L', `-dlopen' and `-dlpreopen'
+options removed.  The configure substitutions that are left in are only
+`@LIBOBJS@' and `@ALLOCA@'; these are left because it is known that
+they will not cause an invalid value for `PROG_DEPENDENCIES' to be
+generated.
+
+
+File: automake1.5.info,  Node: A Library,  Next: A Shared Library,  Prev: A Program,  Up: Programs
+
+9.2 Building a library
+======================
+
+Building a library is much like building a program.  In this case, the
+name of the primary is `LIBRARIES'.  Libraries can be installed in
+`libdir' or `pkglibdir'.
+
+   *Note A Shared Library::, for information on how to build shared
+libraries using Libtool and the `LTLIBRARIES' primary.
+
+   Each `_LIBRARIES' variable is a list of the libraries to be built.
+For instance to create a library named `libcpio.a', but not install it,
+you would write:
+
+     noinst_LIBRARIES = libcpio.a
+
+   The sources that go into a library are determined exactly as they are
+for programs, via the `_SOURCES' variables.  Note that the library name
+is canonicalized (*note Canonicalization::), so the `_SOURCES' variable
+corresponding to `liblob.a' is `liblob_a_SOURCES', not
+`liblob.a_SOURCES'.
+
+   Extra objects can be added to a library using the `LIBRARY_LIBADD'
+variable.  This should be used for objects determined by `configure'.
+Again from `cpio': 
+
+     libcpio_a_LIBADD = @LIBOBJS@ @ALLOCA@
+
+   In addition, sources for extra objects that will not exist until
+configure-time must be added to the `BUILT_SOURCES' variable (*note
+Sources::).
+
+
+File: automake1.5.info,  Node: A Shared Library,  Next: Program and Library Variables,  Prev: A Library,  Up: Programs
+
+9.3 Building a Shared Library
+=============================
+
+Building shared libraries is a relatively complex matter.  For this
+reason, GNU Libtool (*note Introduction: (libtool)Top.) was created to
+help build shared libraries in a platform-independent way.
+
+   Automake uses Libtool to build libraries declared with the
+`LTLIBRARIES' primary.  Each `_LTLIBRARIES' variable is a list of
+shared libraries to build.  For instance, to create a library named
+`libgettext.a' and its corresponding shared libraries, and install them
+in `libdir', write:
+
+     lib_LTLIBRARIES = libgettext.la
+
+   Note that shared libraries _must_ be installed, so
+`check_LTLIBRARIES' is not allowed.  However, `noinst_LTLIBRARIES' is
+allowed.  This feature should be used for libtool "convenience
+libraries".
+
+   For each library, the `LIBRARY_LIBADD' variable contains the names
+of extra libtool objects (`.lo' files) to add to the shared library.
+The `LIBRARY_LDFLAGS' variable contains any additional libtool flags,
+such as `-version-info' or `-static'.
+
+   Where an ordinary library might include `@LIBOBJS@', a libtool
+library must use `@LTLIBOBJS@'.  This is required because the object
+files that libtool operates on do not necessarily end in `.o'.  The
+libtool manual contains more details on this topic.
+
+   For libraries installed in some directory, Automake will
+automatically supply the appropriate `-rpath' option.  However, for
+libraries determined at configure time (and thus mentioned in
+`EXTRA_LTLIBRARIES'), Automake does not know the eventual installation
+directory; for such libraries you must add the `-rpath' option to the
+appropriate `_LDFLAGS' variable by hand.
+
+   Ordinarily, Automake requires that a shared library's name start with
+`lib'.  However, if you are building a dynamically loadable module then
+you might wish to use a "nonstandard" name.  In this case, put
+`-module' into the `_LDFLAGS' variable.
+
+   *Note Using Automake with Libtool: (libtool)Using Automake, for more
+information.
+
+
+File: automake1.5.info,  Node: Program and Library Variables,  Next: LIBOBJS,  Prev: A Shared Library,  Up: Programs
+
+9.4 Program and Library Variables
+=================================
+
+Associated with each program are a collection of variables which can be
+used to modify how that program is built.  There is a similar list of
+such variables for each library.  The canonical name of the program (or
+library) is used as a base for naming these variables.
+
+   In the list below, we use the name "maude" to refer to the program or
+library.  In your `Makefile.am' you would replace this with the
+canonical name of your program.  This list also refers to "maude" as a
+program, but in general the same rules apply for both static and dynamic
+libraries; the documentation below notes situations where programs and
+libraries differ.
+
+`maude_SOURCES'
+     This variable, if it exists, lists all the source files which are
+     compiled to build the program.  These files are added to the
+     distribution by default.  When building the program, Automake will
+     cause each source file to be compiled to a single `.o' file (or
+     `.lo' when using libtool).  Normally these object files are named
+     after the source file, but other factors can change this.  If a
+     file in the `_SOURCES' variable has an unrecognized extension,
+     Automake will do one of two things with it.  If a suffix rule
+     exists for turning files with the unrecognized extension into `.o'
+     files, then automake will treat this file as it will any other
+     source file (*note Support for Other Languages::).  Otherwise, the
+     file will be ignored as though it were a header file.
+
+     The prefixes `dist_' and `nodist_' can be used to control whether
+     files listed in a `_SOURCES' variable are distributed.  `dist_' is
+     redundant, as sources are distributed by default, but it can be
+     specified for clarity if desired.
+
+     It is possible to have both `dist_' and `nodist_' variants of a
+     given `_SOURCES' variable at once; this lets you easily distribute
+     some files and not others, for instance:
+
+          nodist_maude_SOURCES = nodist.c
+          dist_maude_SOURCES = dist-me.c
+
+     By default the output file (on Unix systems, the `.o' file) will be
+     put into the current build directory.  However, if the option
+     `subdir-objects' is in effect in the current directory then the
+     `.o' file will be put into the subdirectory named after the source
+     file.  For instance, with `subdir-objects' enabled,
+     `sub/dir/file.c' will be compiled to `sub/dir/file.o'.  Some
+     people prefer this mode of operation.  You can specify
+     `subdir-objects' in `AUTOMAKE_OPTIONS' (*note Options::).  
+
+`EXTRA_maude_SOURCES'
+     Automake needs to know the list of files you intend to compile
+     _statically_.  For one thing, this is the only way Automake has of
+     knowing what sort of language support a given `Makefile.in'
+     requires.  (1)  This means that, for example, you can't put a
+     configure substitution like `@my_sources@' into a `_SOURCES'
+     variable.  If you intend to conditionally compile source files and
+     use `configure' to substitute the appropriate object names into,
+     e.g., `_LDADD' (see below), then you should list the corresponding
+     source files in the `EXTRA_' variable.
+
+     This variable also supports `dist_' and `nodist_' prefixes, e.g.,
+     `nodist_EXTRA_maude_SOURCES'.
+
+`maude_AR'
+     A static library is created by default by invoking `$(AR) cru'
+     followed by the name of the library and then the objects being put
+     into the library.  You can override this by setting the `_AR'
+     variable.  This is usually used with C++; some C++ compilers
+     require a special invocation in order to instantiate all the
+     templates which should go into a library.  For instance, the SGI
+     C++ compiler likes this macro set like so:
+          libmaude_a_AR = $(CXX) -ar -o
+
+`maude_LIBADD'
+     Extra objects can be added to a static library using the `_LIBADD'
+     variable.  This should be used for objects determined by
+     `configure'.  Note that `_LIBADD' is not used for shared
+     libraries; there you must use `_LDADD'.
+
+`maude_LDADD'
+     Extra objects can be added to a shared library or a program by
+     listing them in the `_LDADD' variable.  This should be used for
+     objects determined by `configure'.
+
+     `_LDADD' is inappropriate for passing program-specific linker flags
+     (except for `-l', `-L', `-dlopen' and `-dlpreopen').  Use the
+     `_LDFLAGS' variable for this purpose.
+
+     For instance, if your `configure.in' uses `AC_PATH_XTRA', you
+     could link your program against the X libraries like so:
+
+          maude_LDADD = $(X_PRE_LIBS) $(X_LIBS) $(X_EXTRA_LIBS)
+
+`maude_LDFLAGS'
+     This variable is used to pass extra flags to the link step of a
+     program or a shared library.
+
+`maude_LINK'
+     You can override the linker on a per-program basis.  By default the
+     linker is chosen according to the languages used by the program.
+     For instance, a program that includes C++ source code would use
+     the C++ compiler to link.  The `_LINK' variable must hold the name
+     of a command which can be passed all the `.o' file names as
+     arguments.  Note that the name of the underlying program is _not_
+     passed to `_LINK'; typically one uses `$@':
+
+          maude_LINK = $(CCLD) -magic -o $@
+
+`maude_CFLAGS'
+     Automake allows you to set compilation flags on a per-program (or
+     per-library) basis.  A single source file can be included in
+     several programs, and it will potentially be compiled with
+     different flags for each program.  This works for any language
+     directly supported by Automake.  The flags are `_CFLAGS',
+     `_CXXFLAGS', `_OBJCFLAGS', `_YFLAGS', `_ASFLAGS', `_FFLAGS',
+     `_RFLAGS', and `_GCJFLAGS'.
+
+     When using a per-program compilation flag, Automake will choose a
+     different name for the intermediate object files.  Ordinarily a
+     file like `sample.c' will be compiled to produce `sample.o'.
+     However, if the program's `_CFLAGS' variable is set, then the
+     object file will be named, for instance, `maude-sample.o'.
+
+     In compilations with per-program flags, the ordinary `AM_' form of
+     the flags variable is _not_ automatically included in the
+     compilation (however, the user form of the variable _is_ included).
+     So for instance, if you want the hypothetical `maude' compilations
+     to also use the value of `AM_CFLAGS', you would need to write:
+
+          maude_CFLAGS = ... your flags ... $(AM_CFLAGS)
+
+`maude_DEPENDENCIES'
+     It is also occasionally useful to have a program depend on some
+     other target which is not actually part of that program.  This can
+     be done using the `_DEPENDENCIES' variable.  Each program depends
+     on the contents of such a variable, but no further interpretation
+     is done.
+
+     If `_DEPENDENCIES' is not supplied, it is computed by Automake.
+     The automatically-assigned value is the contents of `_LDADD', with
+     most configure substitutions, `-l', `-L', `-dlopen' and
+     `-dlpreopen' options removed.  The configure substitutions that are
+     left in are only `@LIBOBJS@' and `@ALLOCA@'; these are left
+     because it is known that they will not cause an invalid value for
+     `_DEPENDENCIES' to be generated.
+
+`maude_SHORTNAME'
+     On some platforms the allowable file names are very short.  In
+     order to support these systems and per-program compilation flags
+     at the same time, Automake allows you to set a "short name" which
+     will influence how intermediate object files are named.  For
+     instance, if you set `maude_SHORTNAME' to `m', then in the above
+     per-program compilation flag example the object file would be named
+     `m-sample.o' rather than `maude-sample.o'.  This facility is
+     rarely needed in practice, and we recommend avoiding it until you
+     find it is required.
+
+   ---------- Footnotes ----------
+
+   (1) There are other, more obscure reasons reasons for this
+limitation as well.
+
+
+File: automake1.5.info,  Node: LIBOBJS,  Next: Program variables,  Prev: Program and Library Variables,  Up: Programs
+
+9.5 Special handling for LIBOBJS and ALLOCA
+===========================================
+
+Automake explicitly recognizes the use of `@LIBOBJS@' and `@ALLOCA@',
+and uses this information, plus the list of `LIBOBJS' files derived
+from `configure.in' to automatically include the appropriate source
+files in the distribution (*note Dist::).  These source files are also
+automatically handled in the dependency-tracking scheme; see *Note
+Dependencies::.
+
+   `@LIBOBJS@' and `@ALLOCA@' are specially recognized in any `_LDADD'
+or `_LIBADD' variable.
+
+
+File: automake1.5.info,  Node: Program variables,  Next: Yacc and Lex,  Prev: LIBOBJS,  Up: Programs
+
+9.6 Variables used when building a program
+==========================================
+
+Occasionally it is useful to know which `Makefile' variables Automake
+uses for compilations; for instance you might need to do your own
+compilation in some special cases.
+
+   Some variables are inherited from Autoconf; these are `CC',
+`CFLAGS', `CPPFLAGS', `DEFS', `LDFLAGS', and `LIBS'.  
+
+   There are some additional variables which Automake itself defines:
+
+`AM_CPPFLAGS'
+     The contents of this macro are passed to every compilation which
+     invokes the C preprocessor; it is a list of arguments to the
+     preprocessor.  For instance, `-I' and `-D' options should be
+     listed here.
+
+     Automake already provides some `-I' options automatically.  In
+     particular it generates `-I$(srcdir)', `-I.', and a `-I' pointing
+     to the directory holding `config.h' (if you've used
+     `AC_CONFIG_HEADER' or `AM_CONFIG_HEADER').  You can disable the
+     default `-I' options using the `nostdinc' option.
+
+`INCLUDES'
+     This does the same job as `AM_CPPFLAGS'.  It is an older name for
+     the same functionality.  This macro is deprecated; we suggest using
+     `AM_CPPFLAGS' instead.
+
+`AM_CFLAGS'
+     This is the variable which the `Makefile.am' author can use to pass
+     in additional C compiler flags.  It is more fully documented
+     elsewhere.  In some situations, this is not used, in preference to
+     the per-executable (or per-library) `CFLAGS'.
+
+`COMPILE'
+     This is the command used to actually compile a C source file.  The
+     filename is appended to form the complete command line.
+
+`LINK'
+     This is the command used to actually link a C program.  It already
+     includes `-o $@' and the usual variable references (for instance,
+     `CFLAGS'); it takes as "arguments" the names of the object files
+     and libraries to link in.
+
+
+File: automake1.5.info,  Node: Yacc and Lex,  Next: C++ Support,  Prev: Program variables,  Up: Programs
+
+9.7 Yacc and Lex support
+========================
+
+Automake has somewhat idiosyncratic support for Yacc and Lex.
+
+   Automake assumes that the `.c' file generated by `yacc' (or `lex')
+should be named using the basename of the input file.  That is, for a
+yacc source file `foo.y', Automake will cause the intermediate file to
+be named `foo.c' (as opposed to `y.tab.c', which is more traditional).
+
+   The extension of a yacc source file is used to determine the
+extension of the resulting `C' or `C++' file.  Files with the extension
+`.y' will be turned into `.c' files; likewise, `.yy' will become `.cc';
+`.y++', `c++'; and `.yxx', `.cxx'.
+
+   Likewise, lex source files can be used to generate `C' or `C++'; the
+extensions `.l', `.ll', `.l++', and `.lxx' are recognized.
+
+   You should never explicitly mention the intermediate (`C' or `C++')
+file in any `SOURCES' variable; only list the source file.
+
+   The intermediate files generated by `yacc' (or `lex') will be
+included in any distribution that is made.  That way the user doesn't
+need to have `yacc' or `lex'.
+
+   If a `yacc' source file is seen, then your `configure.in' must
+define the variable `YACC'.  This is most easily done by invoking the
+macro `AC_PROG_YACC' (*note Particular Program Checks:
+(autoconf)Particular Programs.).
+
+   When `yacc' is invoked, it is passed `YFLAGS' and `AM_YFLAGS'.  The
+former is a user variable and the latter is intended for the
+`Makefile.am' author.
+
+   Similarly, if a `lex' source file is seen, then your `configure.in'
+must define the variable `LEX'.  You can use `AC_PROG_LEX' to do this
+(*note Particular Program Checks: (autoconf)Particular Programs.).
+Automake's `lex' support also requires that you use the `AC_DECL_YYTEXT'
+macro--automake needs to know the value of `LEX_OUTPUT_ROOT'.  This is
+all handled for you if you use the `AM_PROG_LEX' macro (*note Macros::).
+
+   When `yacc' is invoked, it is passed `LFLAGS' and `AM_LFLAGS'.  The
+former is a user variable and the latter is intended for the
+`Makefile.am' author.
+
+   Automake makes it possible to include multiple `yacc' (or `lex')
+source files in a single program.  Automake uses a small program called
+`ylwrap' to run `yacc' (or `lex') in a subdirectory.  This is necessary
+because yacc's output filename is fixed, and a parallel make could
+conceivably invoke more than one instance of `yacc' simultaneously.
+The `ylwrap' program is distributed with Automake.  It should appear in
+the directory specified by `AC_CONFIG_AUX_DIR' (*note Finding
+`configure' Input: (autoconf)Input.), or the current directory if that
+macro is not used in `configure.in'.
+
+   For `yacc', simply managing locking is insufficient.  The output of
+`yacc' always uses the same symbol names internally, so it isn't
+possible to link two `yacc' parsers into the same executable.
+
+   We recommend using the following renaming hack used in `gdb':
+     #define	yymaxdepth c_maxdepth
+     #define	yyparse	c_parse
+     #define	yylex	c_lex
+     #define	yyerror	c_error
+     #define	yylval	c_lval
+     #define	yychar	c_char
+     #define	yydebug	c_debug
+     #define	yypact	c_pact
+     #define	yyr1	c_r1
+     #define	yyr2	c_r2
+     #define	yydef	c_def
+     #define	yychk	c_chk
+     #define	yypgo	c_pgo
+     #define	yyact	c_act
+     #define	yyexca	c_exca
+     #define yyerrflag c_errflag
+     #define yynerrs	c_nerrs
+     #define	yyps	c_ps
+     #define	yypv	c_pv
+     #define	yys	c_s
+     #define	yy_yys	c_yys
+     #define	yystate	c_state
+     #define	yytmp	c_tmp
+     #define	yyv	c_v
+     #define	yy_yyv	c_yyv
+     #define	yyval	c_val
+     #define	yylloc	c_lloc
+     #define yyreds	c_reds
+     #define yytoks	c_toks
+     #define yylhs	c_yylhs
+     #define yylen	c_yylen
+     #define yydefred c_yydefred
+     #define yydgoto	c_yydgoto
+     #define yysindex c_yysindex
+     #define yyrindex c_yyrindex
+     #define yygindex c_yygindex
+     #define yytable	 c_yytable
+     #define yycheck	 c_yycheck
+     #define yyname   c_yyname
+     #define yyrule   c_yyrule
+
+   For each define, replace the `c_' prefix with whatever you like.
+These defines work for `bison', `byacc', and traditional `yacc's.  If
+you find a parser generator that uses a symbol not covered here, please
+report the new name so it can be added to the list.
+
+
+File: automake1.5.info,  Node: C++ Support,  Next: Assembly Support,  Prev: Yacc and Lex,  Up: Programs
+
+9.8 C++ Support
+===============
+
+Automake includes full support for C++.
+
+   Any package including C++ code must define the output variable `CXX'
+in `configure.in'; the simplest way to do this is to use the
+`AC_PROG_CXX' macro (*note Particular Program Checks:
+(autoconf)Particular Programs.).
+
+   A few additional variables are defined when a C++ source file is
+seen:
+
+`CXX'
+     The name of the C++ compiler.
+
+`CXXFLAGS'
+     Any flags to pass to the C++ compiler.
+
+`AM_CXXFLAGS'
+     The maintainer's variant of `CXXFLAGS'.
+
+`CXXCOMPILE'
+     The command used to actually compile a C++ source file.  The file
+     name is appended to form the complete command line.
+
+`CXXLINK'
+     The command used to actually link a C++ program.
+
+
+File: automake1.5.info,  Node: Assembly Support,  Next: Fortran 77 Support,  Prev: C++ Support,  Up: Programs
+
+9.9 Assembly Support
+====================
+
+Automake includes some support for assembly code.
+
+   The variable `AS' holds the name of the compiler used to build
+assembly code.  This compiler must work a bit like a C compiler; in
+particular it must accept `-c' and `-o'.  The value of `ASFLAGS' is
+passed to the compilation.  
+
+   You are required to set `AS' and `ASFLAGS' via `configure.in'.  The
+autoconf macro `AM_PROG_AS' will do this for you.  Unless they are
+already set, it simply sets `AS' to the C compiler and `ASFLAGS' to the
+C compiler flags.
+
+
+File: automake1.5.info,  Node: Fortran 77 Support,  Next: Java Support,  Prev: Assembly Support,  Up: Programs
+
+9.10 Fortran 77 Support
+=======================
+
+Automake includes full support for Fortran 77.
+
+   Any package including Fortran 77 code must define the output variable
+`F77' in `configure.in'; the simplest way to do this is to use the
+`AC_PROG_F77' macro (*note Particular Program Checks:
+(autoconf)Particular Programs.).  *Note Fortran 77 and Autoconf::.
+
+   A few additional variables are defined when a Fortran 77 source file
+is seen:
+
+`F77'
+     The name of the Fortran 77 compiler.
+
+`FFLAGS'
+     Any flags to pass to the Fortran 77 compiler.
+
+`AM_FFLAGS'
+     The maintainer's variant of `FFLAGS'.
+
+`RFLAGS'
+     Any flags to pass to the Ratfor compiler.
+
+`AM_RFLAGS'
+     The maintainer's variant of `RFLAGS'.
+
+`F77COMPILE'
+     The command used to actually compile a Fortran 77 source file.
+     The file name is appended to form the complete command line.
+
+`FLINK'
+     The command used to actually link a pure Fortran 77 program or
+     shared library.
+
+
+   Automake can handle preprocessing Fortran 77 and Ratfor source files
+in addition to compiling them(1).  Automake also contains some support
+for creating programs and shared libraries that are a mixture of
+Fortran 77 and other languages (*note Mixing Fortran 77 With C and
+C++::).
+
+   These issues are covered in the following sections.
+
+* Menu:
+
+* Preprocessing Fortran 77::
+* Compiling Fortran 77 Files::
+* Mixing Fortran 77 With C and C++::
+* Fortran 77 and Autoconf::
+
+   ---------- Footnotes ----------
+
+   (1) Much, if not most, of the information in the following sections
+pertaining to preprocessing Fortran 77 programs was taken almost
+verbatim from *Note Catalogue of Rules: (make)Catalogue of Rules.
+
+
+File: automake1.5.info,  Node: Preprocessing Fortran 77,  Next: Compiling Fortran 77 Files,  Prev: Fortran 77 Support,  Up: Fortran 77 Support
+
+9.10.1 Preprocessing Fortran 77
+-------------------------------
+
+`N.f' is made automatically from `N.F' or `N.r'.  This rule runs just
+the preprocessor to convert a preprocessable Fortran 77 or Ratfor
+source file into a strict Fortran 77 source file.  The precise command
+used is as follows:
+
+`.F'
+     `$(F77) -F $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS)
+     $(AM_FFLAGS) $(FFLAGS)'
+
+`.r'
+     `$(F77) -F $(AM_FFLAGS) $(FFLAGS) $(AM_RFLAGS) $(RFLAGS)'
+
+
+
+File: automake1.5.info,  Node: Compiling Fortran 77 Files,  Next: Mixing Fortran 77 With C and C++,  Prev: Preprocessing Fortran 77,  Up: Fortran 77 Support
+
+9.10.2 Compiling Fortran 77 Files
+---------------------------------
+
+`N.o' is made automatically from `N.f', `N.F' or `N.r' by running the
+Fortran 77 compiler.  The precise command used is as follows:
+
+`.f'
+     `$(F77) -c $(AM_FFLAGS) $(FFLAGS)'
+
+`.F'
+     `$(F77) -c $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS)
+     $(AM_FFLAGS) $(FFLAGS)'
+
+`.r'
+     `$(F77) -c $(AM_FFLAGS) $(FFLAGS) $(AM_RFLAGS) $(RFLAGS)'
+
+
+
+File: automake1.5.info,  Node: Mixing Fortran 77 With C and C++,  Next: Fortran 77 and Autoconf,  Prev: Compiling Fortran 77 Files,  Up: Fortran 77 Support
+
+9.10.3 Mixing Fortran 77 With C and C++
+---------------------------------------
+
+Automake currently provides _limited_ support for creating programs and
+shared libraries that are a mixture of Fortran 77 and C and/or C++.
+However, there are many other issues related to mixing Fortran 77 with
+other languages that are _not_ (currently) handled by Automake, but
+that are handled by other packages(1).
+
+   Automake can help in two ways:
+
+  1. Automatic selection of the linker depending on which combinations
+     of source code.
+
+  2. Automatic selection of the appropriate linker flags (e.g. `-L' and
+     `-l') to pass to the automatically selected linker in order to link
+     in the appropriate Fortran 77 intrinsic and run-time libraries.
+
+     These extra Fortran 77 linker flags are supplied in the output
+     variable `FLIBS' by the `AC_F77_LIBRARY_LDFLAGS' Autoconf macro
+     supplied with newer versions of Autoconf (Autoconf version 2.13 and
+     later).  *Note Fortran 77 Compiler Characteristics:
+     (autoconf)Fortran 77 Compiler Characteristics.
+
+   If Automake detects that a program or shared library (as mentioned in
+some `_PROGRAMS' or `_LTLIBRARIES' primary) contains source code that
+is a mixture of Fortran 77 and C and/or C++, then it requires that the
+macro `AC_F77_LIBRARY_LDFLAGS' be called in `configure.in', and that
+either `$(FLIBS)' or `@FLIBS@' appear in the appropriate `_LDADD' (for
+programs) or `_LIBADD' (for shared libraries) variables.  It is the
+responsibility of the person writing the `Makefile.am' to make sure
+that `$(FLIBS)' or `@FLIBS@' appears in the appropriate `_LDADD' or
+`_LIBADD' variable.
+
+   For example, consider the following `Makefile.am':
+
+     bin_PROGRAMS = foo
+     foo_SOURCES  = main.cc foo.f
+     foo_LDADD    = libfoo.la @FLIBS@
+
+     pkglib_LTLIBRARIES = libfoo.la
+     libfoo_la_SOURCES  = bar.f baz.c zardoz.cc
+     libfoo_la_LIBADD   = $(FLIBS)
+
+   In this case, Automake will insist that `AC_F77_LIBRARY_LDFLAGS' is
+mentioned in `configure.in'.  Also, if `@FLIBS@' hadn't been mentioned
+in `foo_LDADD' and `libfoo_la_LIBADD', then Automake would have issued
+a warning.
+
+* Menu:
+
+* How the Linker is Chosen::
+
+   ---------- Footnotes ----------
+
+   (1) For example, the cfortran package
+(http://www-zeus.desy.de/~burow/cfortran/) addresses all of these
+inter-language issues, and runs under nearly all Fortran 77, C and C++
+compilers on nearly all platforms.  However, `cfortran' is not yet Free
+Software, but it will be in the next major release.
+
+
+File: automake1.5.info,  Node: How the Linker is Chosen,  Prev: Mixing Fortran 77 With C and C++,  Up: Mixing Fortran 77 With C and C++
+
+9.10.3.1 How the Linker is Chosen
+.................................
+
+The following diagram demonstrates under what conditions a particular
+linker is chosen by Automake.
+
+   For example, if Fortran 77, C and C++ source code were to be compiled
+into a program, then the C++ linker will be used.  In this case, if the
+C or Fortran 77 linkers required any special libraries that weren't
+included by the C++ linker, then they must be manually added to an
+`_LDADD' or `_LIBADD' variable by the user writing the `Makefile.am'.
+
+                          \              Linker
+               source      \
+                code        \     C        C++     Fortran
+          -----------------  +---------+---------+---------+
+                             |         |         |         |
+          C                  |    x    |         |         |
+                             |         |         |         |
+                             +---------+---------+---------+
+                             |         |         |         |
+              C++            |         |    x    |         |
+                             |         |         |         |
+                             +---------+---------+---------+
+                             |         |         |         |
+                    Fortran  |         |         |    x    |
+                             |         |         |         |
+                             +---------+---------+---------+
+                             |         |         |         |
+          C + C++            |         |    x    |         |
+                             |         |         |         |
+                             +---------+---------+---------+
+                             |         |         |         |
+          C +       Fortran  |         |         |    x    |
+                             |         |         |         |
+                             +---------+---------+---------+
+                             |         |         |         |
+              C++ + Fortran  |         |    x    |         |
+                             |         |         |         |
+                             +---------+---------+---------+
+                             |         |         |         |
+          C + C++ + Fortran  |         |    x    |         |
+                             |         |         |         |
+                             +---------+---------+---------+
+
+
+File: automake1.5.info,  Node: Fortran 77 and Autoconf,  Prev: Mixing Fortran 77 With C and C++,  Up: Fortran 77 Support
+
+9.10.4 Fortran 77 and Autoconf
+------------------------------
+
+The current Automake support for Fortran 77 requires a recent enough
+version Autoconf that also includes support for Fortran 77.  Full
+Fortran 77 support was added to Autoconf 2.13, so you will want to use
+that version of Autoconf or later.
+
+
+File: automake1.5.info,  Node: Java Support,  Next: Support for Other Languages,  Prev: Fortran 77 Support,  Up: Programs
+
+9.11 Java Support
+=================
+
+Automake includes support for compiled Java, using `gcj', the Java
+front end to the GNU Compiler Collection.
+
+   Any package including Java code to be compiled must define the output
+variable `GCJ' in `configure.in'; the variable `GCJFLAGS' must also be
+defined somehow (either in `configure.in' or `Makefile.am').  The
+simplest way to do this is to use the `AM_PROG_GCJ' macro.
+
+   By default, programs including Java source files are linked with
+`gcj'.
+
+   As always, the contents of `AM_GCJFLAGS' are passed to every
+compilation invoking `gcj' (in its role as an ahead-of-time compiler -
+when invoking it to create `.class' files, `AM_JAVACFLAGS' is used
+instead).  If it is necessary to pass options to `gcj' from
+`Makefile.am', this macro, and not the user macro `GCJFLAGS', should be
+used.
+
+   `gcj' can be used to compile `.java', `.class', `.zip', or `.jar'
+files.
+
+
+File: automake1.5.info,  Node: Support for Other Languages,  Next: ANSI,  Prev: Java Support,  Up: Programs
+
+9.12 Support for Other Languages
+================================
+
+Automake currently only includes full support for C, C++ (*note C++
+Support::), Fortran 77 (*note Fortran 77 Support::), and Java (*note
+Java Support::).  There is only rudimentary support for other
+languages, support for which will be improved based on user demand.
+
+   Some limited support for adding your own languages is available via
+the suffix rule handling; see *Note Suffixes::.
+
+
+File: automake1.5.info,  Node: ANSI,  Next: Dependencies,  Prev: Support for Other Languages,  Up: Programs
+
+9.13 Automatic de-ANSI-fication
+===============================
+
+Although the GNU standards allow the use of ANSI C, this can have the
+effect of limiting portability of a package to some older compilers
+(notably the SunOS C compiler).
+
+   Automake allows you to work around this problem on such machines by
+"de-ANSI-fying" each source file before the actual compilation takes
+place.
+
+   If the `Makefile.am' variable `AUTOMAKE_OPTIONS' (*note Options::)
+contains the option `ansi2knr' then code to handle de-ANSI-fication is
+inserted into the generated `Makefile.in'.
+
+   This causes each C source file in the directory to be treated as
+ANSI C.  If an ANSI C compiler is available, it is used.  If no ANSI C
+compiler is available, the `ansi2knr' program is used to convert the
+source files into K&R C, which is then compiled.
+
+   The `ansi2knr' program is simple-minded.  It assumes the source code
+will be formatted in a particular way; see the `ansi2knr' man page for
+details.
+
+   Support for de-ANSI-fication requires the source files `ansi2knr.c'
+and `ansi2knr.1' to be in the same package as the ANSI C source; these
+files are distributed with Automake.  Also, the package `configure.in'
+must call the macro `AM_C_PROTOTYPES' (*note Macros::).  
+
+   Automake also handles finding the `ansi2knr' support files in some
+other directory in the current package.  This is done by prepending the
+relative path to the appropriate directory to the `ansi2knr' option.
+For instance, suppose the package has ANSI C code in the `src' and
+`lib' subdirs.  The files `ansi2knr.c' and `ansi2knr.1' appear in
+`lib'.  Then this could appear in `src/Makefile.am':
+
+     AUTOMAKE_OPTIONS = ../lib/ansi2knr
+
+   If no directory prefix is given, the files are assumed to be in the
+current directory.
+
+   Files mentioned in `LIBOBJS' which need de-ANSI-fication will not be
+automatically handled.  That's because `configure' will generate an
+object name like `regex.o', while `make' will be looking for `regex_.o'
+(when de-ANSI-fying).  Eventually this problem will be fixed via
+`autoconf' magic, but for now you must put this code into your
+`configure.in', just before the `AC_OUTPUT' call:
+
+     # This is necessary so that .o files in LIBOBJS are also built via
+     # the ANSI2KNR-filtering rules.
+     LIBOBJS=`echo $LIBOBJS|sed 's/\.o /\$U.o /g;s/\.o$/\$U.o/'`
+
+   Note that automatic de-ANSI-fication will not work when the package
+is being built for a different host architecture.  That is because
+automake currently has no way to build `ansi2knr' for the build machine.
+
+
+File: automake1.5.info,  Node: Dependencies,  Next: EXEEXT,  Prev: ANSI,  Up: Programs
+
+9.14 Automatic dependency tracking
+==================================
+
+As a developer it is often painful to continually update the
+`Makefile.in' whenever the include-file dependencies change in a
+project.  Automake supplies a way to automatically track dependency
+changes.
+
+   Automake always uses complete dependencies for a compilation,
+including system headers.  Automake's model is that dependency
+computation should be a side effect of the build.  To this end,
+dependencies are computed by running all compilations through a special
+wrapper program called `depcomp'.  `depcomp' understands how to coax
+many different C and C++ compilers into generating dependency
+information in the format it requires.  `automake -a' will install
+`depcomp' into your source tree for you.  If `depcomp' can't figure out
+how to properly invoke your compiler, dependency tracking will simply
+be disabled for your build.
+
+   Experience with earlier versions of Automake (1) taught us that it
+is not reliable to generate dependencies only on the maintainer's
+system, as configurations vary too much.  So instead Automake
+implements dependency tracking at build time.
+
+   Automatic dependency tracking can be suppressed by putting
+`no-dependencies' in the variable `AUTOMAKE_OPTIONS'.  Or, you can
+invoke `automake' with the `-i' option.  Dependency tracking is enabled
+by default.
+
+   The person building your package also can choose to disable
+dependency tracking by configuring with `--disable-dependency-tracking'.
+
+   ---------- Footnotes ----------
+
+   (1) See `http://sources.redhat.com/automake/dependencies.html' for
+more information on the history and experiences with automatic
+dependency tracking in Automake
+
+
+File: automake1.5.info,  Node: EXEEXT,  Prev: Dependencies,  Up: Programs
+
+9.15 Support for executable extensions
+======================================
+
+On some platforms, such as Windows, executables are expected to have an
+extension such as `.exe'.  On these platforms, some compilers (GCC
+among them) will automatically generate `foo.exe' when asked to
+generate `foo'.
+
+   Automake provides mostly-transparent support for this.  Unfortunately
+the support isn't completely transparent; if you want your package to
+support these platforms then you must assist.
+
+   One thing you must be aware of is that, internally, Automake rewrites
+something like this:
+
+     bin_PROGRAMS = liver
+
+   to this:
+
+     bin_PROGRAMS = liver$(EXEEXT)
+
+   The targets Automake generates are likewise given the `$(EXEEXT)'
+extension.  `EXEEXT'
+
+   However, Automake cannot apply this rewriting to `configure'
+substitutions.  This means that if you are conditionally building a
+program using such a substitution, then your `configure.in' must take
+care to add `$(EXEEXT)' when constructing the output variable.
+
+   With Autoconf 2.13 and earlier, you must explicitly use `AC_EXEEXT'
+to get this support.  With Autoconf 2.50, `AC_EXEEXT' is run
+automatically if you configure a compiler (say, through `AC_PROG_CC').
+
+   Sometimes maintainers like to write an explicit link rule for their
+program.  Without executable extension support, this is easy--you
+simply write a target with the same name as the program.  However, when
+executable extension support is enabled, you must instead add the
+`$(EXEEXT)' suffix.
+
+   Unfortunately, due to the change in Autoconf 2.50, this means you
+must always add this extension.  However, this is a problem for
+maintainers who know their package will never run on a platform that
+has executable extensions.  For those maintainers, the `no-exeext'
+option (*note Options::) will disable this feature.  This works in a
+fairly ugly way; if `no-exeext' is seen, then the presence of a target
+named `foo' in `Makefile.am' will override an automake-generated target
+of the form `foo$(EXEEXT)'.  Without the `no-exeext' option, this use
+will give an error.
+
+
+File: automake1.5.info,  Node: Other objects,  Next: Other GNU Tools,  Prev: Programs,  Up: Top
+
+10 Other Derived Objects
+************************
+
+Automake can handle derived objects which are not C programs.  Sometimes
+the support for actually building such objects must be explicitly
+supplied, but Automake will still automatically handle installation and
+distribution.
+
+* Menu:
+
+* Scripts::                     Executable scripts
+* Headers::                     Header files
+* Data::                        Architecture-independent data files
+* Sources::                     Derived sources
+
+
+File: automake1.5.info,  Node: Scripts,  Next: Headers,  Prev: Other objects,  Up: Other objects
+
+10.1 Executable Scripts
+=======================
+
+It is possible to define and install programs which are scripts.  Such
+programs are listed using the `SCRIPTS' primary name.  Automake doesn't
+define any dependencies for scripts; the `Makefile.am' should include
+the appropriate rules.  
+
+   Automake does not assume that scripts are derived objects; such
+objects must be deleted by hand (*note Clean::).
+
+   The `automake' program itself is a Perl script that is generated at
+configure time from `automake.in'.  Here is how this is handled:
+
+     bin_SCRIPTS = automake
+
+   Since `automake' appears in the `AC_OUTPUT' macro, a target for it
+is automatically generated.
+
+   Script objects can be installed in `bindir', `sbindir',
+`libexecdir', or `pkgdatadir'.
+
+
+File: automake1.5.info,  Node: Headers,  Next: Data,  Prev: Scripts,  Up: Other objects
+
+10.2 Header files
+=================
+
+Header files are specified by the `HEADERS' family of variables.
+Generally header files are not installed, so the `noinst_HEADERS'
+variable will be the most used.  (1) 
+
+   All header files must be listed somewhere; missing ones will not
+appear in the distribution.  Often it is clearest to list uninstalled
+headers with the rest of the sources for a program.  *Note A Program::.
+Headers listed in a `_SOURCES' variable need not be listed in any
+`_HEADERS' variable.
+
+   Headers can be installed in `includedir', `oldincludedir', or
+`pkgincludedir'.
+
+   ---------- Footnotes ----------
+
+   (1) However, for the case of a non-installed header file that is
+actually used by a particular program, we recommend listing it in the
+program's `_SOURCES' variable instead of in `noinst_HEADERS'.  We
+believe this is more clear.
+
+
+File: automake1.5.info,  Node: Data,  Next: Sources,  Prev: Headers,  Up: Other objects
+
+10.3 Architecture-independent data files
+========================================
+
+Automake supports the installation of miscellaneous data files using the
+`DATA' family of variables.  
+
+   Such data can be installed in the directories `datadir',
+`sysconfdir', `sharedstatedir', `localstatedir', or `pkgdatadir'.
+
+   By default, data files are _not_ included in a distribution.  Of
+course, you can use the `dist_' prefix to change this on a per-variable
+basis.
+
+   Here is how Automake installs its auxiliary data files:
+
+     pkgdata_DATA = clean-kr.am clean.am ...
+
+
+File: automake1.5.info,  Node: Sources,  Prev: Data,  Up: Other objects
+
+10.4 Built sources
+==================
+
+Occasionally a file which would otherwise be called `source' (e.g. a C
+`.h' file) is actually derived from some other file.  Such files should
+be listed in the `BUILT_SOURCES' variable.  
+
+   `BUILT_SOURCES' is actually a bit of a misnomer, as any file which
+must be created early in the build process can be listed in this
+variable.
+
+   A source file listed in `BUILT_SOURCES' is created before the other
+`all' targets are made.  However, such a source file is not compiled
+unless explicitly requested by mentioning it in some other `_SOURCES'
+variable.
+
+   So, for instance, if you had header files which were created by a
+script run at build time, then you would list these headers in
+`BUILT_SOURCES', to ensure that they would be built before any other
+compilations (perhaps ones using these headers) were started.
+
+
+File: automake1.5.info,  Node: Other GNU Tools,  Next: Documentation,  Prev: Other objects,  Up: Top
+
+11 Other GNU Tools
+******************
+
+Since Automake is primarily intended to generate `Makefile.in's for use
+in GNU programs, it tries hard to interoperate with other GNU tools.
+
+* Menu:
+
+* Emacs Lisp::                  Emacs Lisp
+* gettext::                     Gettext
+* Libtool::                     Libtool
+* Java::                        Java
+* Python::                      Python
+
+
+File: automake1.5.info,  Node: Emacs Lisp,  Next: gettext,  Prev: Other GNU Tools,  Up: Other GNU Tools
+
+11.1 Emacs Lisp
+===============
+
+Automake provides some support for Emacs Lisp.  The `LISP' primary is
+used to hold a list of `.el' files.  Possible prefixes for this primary
+are `lisp_' and `noinst_'.  Note that if `lisp_LISP' is defined, then
+`configure.in' must run `AM_PATH_LISPDIR' (*note Macros::).
+
+   By default Automake will byte-compile all Emacs Lisp source files
+using the Emacs found by `AM_PATH_LISPDIR'.  If you wish to avoid
+byte-compiling, simply define the variable `ELCFILES' to be empty.
+Byte-compiled Emacs Lisp files are not portable among all versions of
+Emacs, so it makes sense to turn this off if you expect sites to have
+more than one version of Emacs installed.  Furthermore, many packages
+don't actually benefit from byte-compilation.  Still, we recommend that
+you leave it enabled by default.  It is probably better for sites with
+strange setups to cope for themselves than to make the installation less
+nice for everybody else.
+
+
+File: automake1.5.info,  Node: gettext,  Next: Libtool,  Prev: Emacs Lisp,  Up: Other GNU Tools
+
+11.2 Gettext
+============
+
+If `AM_GNU_GETTEXT' is seen in `configure.in', then Automake turns on
+support for GNU gettext, a message catalog system for
+internationalization (*note GNU Gettext: (gettext)GNU Gettext.).
+
+   The `gettext' support in Automake requires the addition of two
+subdirectories to the package, `intl' and `po'.  Automake insures that
+these directories exist and are mentioned in `SUBDIRS'.
+
+
+File: automake1.5.info,  Node: Libtool,  Next: Java,  Prev: gettext,  Up: Other GNU Tools
+
+11.3 Libtool
+============
+
+Automake provides support for GNU Libtool (*note Introduction:
+(libtool)Top.) with the `LTLIBRARIES' primary.  *Note A Shared
+Library::.
+
+
+File: automake1.5.info,  Node: Java,  Next: Python,  Prev: Libtool,  Up: Other GNU Tools
+
+11.4 Java
+=========
+
+Automake provides some minimal support for Java compilation with the
+`JAVA' primary.
+
+   Any `.java' files listed in a `_JAVA' variable will be compiled with
+`JAVAC' at build time.  By default, `.class' files are not included in
+the distribution.
+
+   Currently Automake enforces the restriction that only one `_JAVA'
+primary can be used in a given `Makefile.am'.  The reason for this
+restriction is that, in general, it isn't possible to know which
+`.class' files were generated from which `.java' files - so it would be
+impossible to know which files to install where.  For instance, a
+`.java' file can define multiple classes; the resulting `.class' file
+names cannot be predicted without parsing the `.java' file.
+
+   There are a few variables which are used when compiling Java sources:
+
+`JAVAC'
+     The name of the Java compiler.  This defaults to `javac'.
+
+`JAVACFLAGS'
+     The flags to pass to the compiler.  This is considered to be a user
+     variable (*note User Variables::).
+
+`AM_JAVACFLAGS'
+     More flags to pass to the Java compiler.  This, and not
+     `JAVACFLAGS', should be used when it is necessary to put Java
+     compiler flags into `Makefile.am'.
+
+`JAVAROOT'
+     The value of this variable is passed to the `-d' option to
+     `javac'.  It defaults to `$(top_builddir)'.
+
+`CLASSPATH_ENV'
+     This variable is an `sh' expression which is used to set the
+     `CLASSPATH' environment variable on the `javac' command line.  (In
+     the future we will probably handle class path setting differently.)
+
+
+File: automake1.5.info,  Node: Python,  Prev: Java,  Up: Other GNU Tools
+
+11.5 Python
+===========
+
+Automake provides support for Python modules.  Automake will turn on
+Python support if the `AM_PATH_PYTHON' macro is used in `configure.in'.
+The `PYTHON' primary is used to hold a list of `.py' files.  Possible
+prefixes for this primary are `python_' and `noinst_'.  Note that if
+`python_PYTHON' is defined, then `configure.in' must run
+`AM_PATH_PYTHON'.  Python source files are included in the distribution
+by default.
+
+   `AM_PATH_PYTHON' takes a single optional argument.  This argument,
+if present, is the minimum version of Python which can be used for this
+package.  If the version of Python found on the system is older than the
+required version, then `AM_PATH_PYTHON' will cause an error.
+
+   `AM_PATH_PYTHON' creates several output variables based on the
+Python installation found during configuration.
+
+`PYTHON'
+     The name of the Python executable.
+
+`PYTHON_VERSION'
+     The Python version number, in the form MAJOR.MINOR (e.g. `1.5').
+     This is currently the value of `sys.version[:3]'.
+
+`PYTHON_PREFIX'
+     The string `$prefix'.  This term may be used in future work which
+     needs the contents of Python's `sys.prefix', but general consensus
+     is to always use the value from configure.
+
+`PYTHON_EXEC_PREFIX'
+     The string `$exec_prefix'.  This term may be used in future work
+     which needs the contents of Python's `sys.exec_prefix', but general
+     consensus is to always use the value from configure.
+
+`PYTHON_PLATFORM'
+     The canonical name used by Python to describe the operating
+     system, as given by `sys.platform'.  This value is sometimes
+     needed when building Python extensions.
+
+`pythondir'
+     The directory name for the `site-packages' subdirectory of the
+     standard Python install tree.
+
+`pkgpythondir'
+     This is is the directory under `pythondir' which is named after the
+     package.  That is, it is `$(pythondir)/$(PACKAGE)'.  It is provided
+     as a convenience.
+
+`pyexecdir'
+     This is the directory where Python extension modules (shared
+     libraries) should be installed.
+
+`pkgpyexecdir'
+     This is a convenience variable which is defined as
+     `$(pyexecdir)/$(PACKAGE)'.
+
+   By default Automake will byte-compile all Python source files to both
+`.pyc' and `.pyo' forms.  If you wish to avoid generating the optimized
+byte-code files, simply define the variable `PYOFILES' to be empty.
+Similarly, if you don't wish to generate the standard byte-compiled
+files, define the variable `PYCFILES' to be empty.
+
+
+File: automake1.5.info,  Node: Documentation,  Next: Install,  Prev: Other GNU Tools,  Up: Top
+
+12 Building documentation
+*************************
+
+Currently Automake provides support for Texinfo and man pages.
+
+* Menu:
+
+* Texinfo::                     Texinfo
+* Man pages::                   Man pages
+
+
+File: automake1.5.info,  Node: Texinfo,  Next: Man pages,  Prev: Documentation,  Up: Documentation
+
+12.1 Texinfo
+============
+
+If the current directory contains Texinfo source, you must declare it
+with the `TEXINFOS' primary.  Generally Texinfo files are converted
+into info, and thus the `info_TEXINFOS' macro is most commonly used
+here.  Any Texinfo source file must end in the `.texi', `.txi', or
+`.texinfo' extension.  We recommend `.texi' for new manuals.  
+
+   If the `.texi' file `@include's `version.texi', then that file will
+be automatically generated.  The file `version.texi' defines four
+Texinfo macros you can reference:
+
+`EDITION'
+`VERSION'
+     Both of these macros hold the version number of your program.
+     They are kept separate for clarity.
+
+`UPDATED'
+     This holds the date the primary `.texi' file was last modified.
+
+`UPDATED-MONTH'
+     This holds the name of the month in which the primary `.texi' file
+     was last modified.
+
+   The `version.texi' support requires the `mdate-sh' program; this
+program is supplied with Automake and automatically included when
+`automake' is invoked with the `--add-missing' option.
+
+   If you have multiple Texinfo files, and you want to use the
+`version.texi' feature, then you have to have a separate version file
+for each Texinfo file.  Automake will treat any include in a Texinfo
+file that matches `vers*.texi' just as an automatically generated
+version file.
+
+   When an info file is rebuilt, the program named by the `MAKEINFO'
+variable is used to invoke it.  If the `makeinfo' program is found on
+the system then it will be used by default; otherwise `missing' will be
+used instead.  The flags in the variables `MAKEINFOFLAGS' and
+`AM_MAKEINFOFLAGS' will be passed to the `makeinfo' invocation; the
+first of these is intended for use by the user (*note User Variables::)
+and the second by the `Makefile.am' writer.  
+
+   Sometimes an info file actually depends on more than one `.texi'
+file.  For instance, in GNU Hello, `hello.texi' includes the file
+`gpl.texi'.  You can tell Automake about these dependencies using the
+`TEXI_TEXINFOS' variable.  Here is how GNU Hello does it: 
+
+     info_TEXINFOS = hello.texi
+     hello_TEXINFOS = gpl.texi
+
+   By default, Automake requires the file `texinfo.tex' to appear in
+the same directory as the Texinfo source.  However, if you used
+`AC_CONFIG_AUX_DIR' in `configure.in' (*note Finding `configure' Input:
+(autoconf)Input.), then `texinfo.tex' is looked for there.  Automake
+supplies `texinfo.tex' if `--add-missing' is given.
+
+   If your package has Texinfo files in many directories, you can use
+the variable `TEXINFO_TEX' to tell Automake where to find the canonical
+`texinfo.tex' for your package.  The value of this variable should be
+the relative path from the current `Makefile.am' to `texinfo.tex':
+
+     TEXINFO_TEX = ../doc/texinfo.tex
+
+   The option `no-texinfo.tex' can be used to eliminate the requirement
+for `texinfo.tex'.  Use of the variable `TEXINFO_TEX' is preferable,
+however, because that allows the `dvi' target to still work.
+
+   Automake generates an `install-info' target; some people apparently
+use this.  By default, info pages are installed by `make install'.
+This can be prevented via the `no-installinfo' option.
+
+
+File: automake1.5.info,  Node: Man pages,  Prev: Texinfo,  Up: Documentation
+
+12.2 Man pages
+==============
+
+A package can also include man pages (but see the GNU standards on this
+matter, *Note Man Pages: (standards)Man Pages.)  Man pages are declared
+using the `MANS' primary.  Generally the `man_MANS' macro is used.  Man
+pages are automatically installed in the correct subdirectory of
+`mandir', based on the file extension.  
+
+   File extensions such as `.1c' are handled by looking for the valid
+part of the extension and using that to determine the correct
+subdirectory of `mandir'.  Valid section names are the digits `0'
+through `9', and the letters `l' and `n'.
+
+   Sometimes developers prefer to name a man page something like
+`foo.man' in the source, and then rename it to have the correct suffix,
+e.g. `foo.1', when installing the file.  Automake also supports this
+mode.  For a valid section named SECTION, there is a corresponding
+directory named `manSECTIONdir', and a corresponding `_MANS' variable.
+Files listed in such a variable are installed in the indicated section.
+If the file already has a valid suffix, then it is installed as-is;
+otherwise the file suffix is changed to match the section.
+
+   For instance, consider this example:
+     man1_MANS = rename.man thesame.1 alsothesame.1c
+
+   In this case, `rename.man' will be renamed to `rename.1' when
+installed, but the other files will keep their names.
+
+   By default, man pages are installed by `make install'.  However,
+since the GNU project does not require man pages, many maintainers do
+not expend effort to keep the man pages up to date.  In these cases, the
+`no-installman' option will prevent the man pages from being installed
+by default.  The user can still explicitly install them via `make
+install-man'.  
+
+   Here is how the man pages are handled in GNU `cpio' (which includes
+both Texinfo documentation and man pages):
+
+     man_MANS = cpio.1 mt.1
+     EXTRA_DIST = $(man_MANS)
+
+   Man pages are not currently considered to be source, because it is
+not uncommon for man pages to be automatically generated.  Therefore
+they are not automatically included in the distribution.  However, this
+can be changed by use of the `dist_' prefix.
+
+   The `nobase_' prefix is meaningless for man pages and is disallowed.
+
+
+File: automake1.5.info,  Node: Install,  Next: Clean,  Prev: Documentation,  Up: Top
+
+13 What Gets Installed
+**********************
+
+13.1 Basics of installation
+===========================
+
+Naturally, Automake handles the details of actually installing your
+program once it has been built.  All files named by the various
+primaries are automatically installed in the appropriate places when the
+user runs `make install'.
+
+   A file named in a primary is installed by copying the built file into
+the appropriate directory.  The base name of the file is used when
+installing.
+
+     bin_PROGRAMS = hello subdir/goodbye
+
+   In this example, both `hello' and `goodbye' will be installed in
+`$(bindir)'.
+
+   Sometimes it is useful to avoid the basename step at install time.
+For instance, you might have a number of header files in subdirectories
+of the source tree which are laid out precisely how you want to install
+them.  In this situation you can use the `nobase_' prefix to suppress
+the base name step.  For example:
+
+     nobase_include_HEADERS = stdio.h sys/types.h
+
+   Will install `stdio.h' in `$(includedir)' and `types.h' in
+`$(includedir)/sys'.
+
+13.2 The two parts of install
+=============================
+
+Automake generates separate `install-data' and `install-exec' targets,
+in case the installer is installing on multiple machines which share
+directory structure--these targets allow the machine-independent parts
+to be installed only once.  `install-exec' installs platform-dependent
+files, and `install-data' installs platform-independent files.  The
+`install' target depends on both of these targets.  While Automake
+tries to automatically segregate objects into the correct category, the
+`Makefile.am' author is, in the end, responsible for making sure this
+is done correctly.  
+
+   Variables using the standard directory prefixes `data', `info',
+`man', `include', `oldinclude', `pkgdata', or `pkginclude' (e.g.
+`data_DATA') are installed by `install-data'.
+
+   Variables using the standard directory prefixes `bin', `sbin',
+`libexec', `sysconf', `localstate', `lib', or `pkglib' (e.g.
+`bin_PROGRAMS') are installed by `install-exec'.
+
+   Any variable using a user-defined directory prefix with `exec' in
+the name (e.g. `myexecbin_PROGRAMS' is installed by `install-exec'.
+All other user-defined prefixes are installed by `install-data'.
+
+13.3 Extending installation
+===========================
+
+It is possible to extend this mechanism by defining an
+`install-exec-local' or `install-data-local' target.  If these targets
+exist, they will be run at `make install' time.  These rules can do
+almost anything; care is required.  
+
+   Automake also supports two install hooks, `install-exec-hook' and
+`install-data-hook'.  These hooks are run after all other install rules
+of the appropriate type, exec or data, have completed.  So, for
+instance, it is possible to perform post-installation modifications
+using an install hook.  
+
+13.4 Staged installs
+====================
+
+Automake generates support for the `DESTDIR' variable in all install
+rules.  `DESTDIR' is used during the `make install' step to relocate
+install objects into a staging area.  Each object and path is prefixed
+with the value of `DESTDIR' before being copied into the install area.
+Here is an example of typical DESTDIR usage:
+
+     make DESTDIR=/tmp/staging install
+
+   This places install objects in a directory tree built under
+`/tmp/staging'.  If `/gnu/bin/foo' and `/gnu/share/aclocal/foo.m4' are
+to be installed, the above command would install
+`/tmp/staging/gnu/bin/foo' and `/tmp/staging/gnu/share/aclocal/foo.m4'.
+
+   This feature is commonly used to build install images and packages.
+For more information, see *Note Makefile Conventions:
+(standards)Makefile Conventions.
+
+   Support for `DESTDIR' is implemented by coding it directly into the
+install rules.  If your `Makefile.am' uses a local install rule (e.g.,
+`install-exec-local') or an install hook, then you must write that code
+to repsect `DESTDIR'.
+
+13.5 Rules for the user
+=======================
+
+Automake also generates an `uninstall' target, an `installdirs' target,
+and an `install-strip' target.  
+
+   Automake supports `uninstall-local' and `uninstall-hook'.  There is
+no notion of separate uninstalls for "exec" and "data", as that does
+not make sense.
+
+   Note that `uninstall' is not meant as a replacement for a real
+packaging tool.
+
+
+File: automake1.5.info,  Node: Clean,  Next: Dist,  Prev: Install,  Up: Top
+
+14 What Gets Cleaned
+********************
+
+The GNU Makefile Standards specify a number of different clean rules.
+Generally the files that can be cleaned are determined automatically by
+Automake.  Of course, Automake also recognizes some variables that can
+be defined to specify additional files to clean.  These variables are
+`MOSTLYCLEANFILES', `CLEANFILES', `DISTCLEANFILES', and
+`MAINTAINERCLEANFILES'.  
+
+   As the GNU Standards aren't always explicit as to which files should
+be removed by which target, we've adopted a heuristic which we believe
+was first formulated by Franc,ois Pinard:
+
+   * If `make' built it, and it is commonly something that one would
+     want to rebuild (for instance, a `.o' file), then `mostlyclean'
+     should delete it.
+
+   * Otherwise, if `make' built it, then `clean' should delete it.
+
+   * If `configure' built it, then `distclean' should delete it
+
+   * If the maintainer built it, then `maintainer-clean' should delete
+     it.
+
+   We recommend that you follow this same set of heuristics in your
+`Makefile.am'.
+
+
+File: automake1.5.info,  Node: Dist,  Next: Tests,  Prev: Clean,  Up: Top
+
+15 What Goes in a Distribution
+******************************
+
+15.1 Basics of distribution
+===========================
+
+The `dist' target in the generated `Makefile.in' can be used to
+generate a gzip'd `tar' file for distribution.  The tar file is named
+based on the `PACKAGE' and `VERSION' variables; more precisely it is
+named `PACKAGE-VERSION.tar.gz'.  You can use the `make' variable
+`GZIP_ENV' to control how gzip is run.  The default setting is `--best'.
+
+   For the most part, the files to distribute are automatically found by
+Automake: all source files are automatically included in a distribution,
+as are all `Makefile.am's and `Makefile.in's.  Automake also has a
+built-in list of commonly used files which, if present in the current
+directory, are automatically included.  This list is printed by
+`automake --help'.  Also, files which are read by `configure' (i.e. the
+source files corresponding to the files specified in the `AC_OUTPUT'
+invocation) are automatically distributed.
+
+   Still, sometimes there are files which must be distributed, but which
+are not covered in the automatic rules.  These files should be listed in
+the `EXTRA_DIST' variable.  You can mention files from subdirectories
+in `EXTRA_DIST'.
+
+   You can also mention a directory in `EXTRA_DIST'; in this case the
+entire directory will be recursively copied into the distribution.
+Please note that this will also copy _everything_ in the directory,
+including CVS/RCS version control files.  We recommend against using
+this feature.
+
+15.2 Fine-grained distribution control
+======================================
+
+Sometimes you need tighter control over what does _not_ go into the
+distribution; for instance you might have source files which are
+generated and which you do not want to distribute.  In this case
+Automake gives fine-grained control using the `dist' and `nodist'
+prefixes.  Any primary or `_SOURCES' variable can be prefixed with
+`dist_' to add the listed files to the distribution.  Similarly,
+`nodist_' can be used to omit the files from the distribution.  
+
+   As an example, here is how you would cause some data to be
+distributed while leaving some source code out of the distribution:
+
+     dist_data_DATA = distribute-this
+     bin_PROGRAMS = foo
+     nodist_foo_SOURCES = do-not-distribute.c
+
+15.3 The dist hook
+==================
+
+Another way to to use this is for removing unnecessary files that get
+recursively included by specifying a directory in EXTRA_DIST:
+
+     EXTRA_DIST = doc
+
+     dist-hook:
+     	rm -rf `find $(distdir)/doc -name CVS`
+
+   If you define `SUBDIRS', Automake will recursively include the
+subdirectories in the distribution.  If `SUBDIRS' is defined
+conditionally (*note Conditionals::), Automake will normally include all
+directories that could possibly appear in `SUBDIRS' in the
+distribution.  If you need to specify the set of directories
+conditionally, you can set the variable `DIST_SUBDIRS' to the exact
+list of subdirectories to include in the distribution.  
+
+   Occasionally it is useful to be able to change the distribution
+before it is packaged up.  If the `dist-hook' target exists, it is run
+after the distribution directory is filled, but before the actual tar
+(or shar) file is created.  One way to use this is for distributing
+files in subdirectories for which a new `Makefile.am' is overkill:
+
+     dist-hook:
+             mkdir $(distdir)/random
+             cp -p $(srcdir)/random/a1 $(srcdir)/random/a2 $(distdir)/random
+
+15.4 Checking the distribution
+==============================
+
+Automake also generates a `distcheck' target which can be of help to
+ensure that a given distribution will actually work.  `distcheck' makes
+a distribution, and then tries to do a `VPATH' build.  
+
+   If the target `distcheck-hook' is defined in your `Makefile.am',
+then it will be invoked by `distcheck' after the new distribution has
+been unpacked, but before the unpacked copy is configured and built.
+Your `distcheck-hook' can do almost anything, though as always caution
+is advised.  Generally this hook is used to check for potential
+distribution errors not caught by the standard mechanism.
+
+15.5 The types of distributions
+===============================
+
+By default Automake generates a `.tar.gz' file when asked to create a
+distribution.  However, some projects prefer different packaging
+formats.  Automake accomodates most of these using options; *Note
+Options::.
+
+   Automake also generates a `dist-all' target which can be used to
+make all the requested packaged distributions at once.
+
+
+File: automake1.5.info,  Node: Tests,  Next: Options,  Prev: Dist,  Up: Top
+
+16 Support for test suites
+**************************
+
+Automake supports two forms of test suites.
+
+16.1 Simple Tests
+=================
+
+If the variable `TESTS' is defined, its value is taken to be a list of
+programs to run in order to do the testing.  The programs can either be
+derived objects or source objects; the generated rule will look both in
+`srcdir' and `.'.  Programs needing data files should look for them in
+`srcdir' (which is both an environment variable and a make variable) so
+they work when building in a separate directory (*note Build
+Directories: (autoconf)Build Directories.), and in particular for the
+`distcheck' target (*note Dist::).
+
+   The number of failures will be printed at the end of the run.  If a
+given test program exits with a status of 77, then its result is ignored
+in the final count.  This feature allows non-portable tests to be
+ignored in environments where they don't make sense.
+
+   The variable `TESTS_ENVIRONMENT' can be used to set environment
+variables for the test run; the environment variable `srcdir' is set in
+the rule.  If all your test programs are scripts, you can also set
+`TESTS_ENVIRONMENT' to an invocation of the shell (e.g.  `$(SHELL)
+-x'); this can be useful for debugging the tests.  
+
+   You may define the variable `XFAIL_TESTS' to a list of tests
+(usually a subset of `TESTS') that are expected to fail.  This will
+reverse the result of those tests.  
+
+   Automake ensures that each program listed in `TESTS' is built before
+any tests are run; you can list both source and derived programs in
+`TESTS'.  For instance, you might want to run a C program as a test.
+To do this you would list its name in `TESTS' and also in
+`check_PROGRAMS', and then specify it as you would any other program.
+
+16.2 DejaGNU Tests
+==================
+
+If `dejagnu' (ftp://prep.ai.mit.edu/pub/gnu/dejagnu-1.3.tar.gz) appears
+in `AUTOMAKE_OPTIONS', then a `dejagnu'-based test suite is assumed.
+The variable `DEJATOOL' is a list of names which are passed, one at a
+time, as the `--tool' argument to `runtest' invocations; it defaults to
+the name of the package.
+
+   The variable `RUNTESTDEFAULTFLAGS' holds the `--tool' and `--srcdir'
+flags that are passed to dejagnu by default; this can be overridden if
+necessary.  
+
+   The variables `EXPECT' and `RUNTEST' can also be overridden to
+provide project-specific values.  For instance, you will need to do
+this if you are testing a compiler toolchain, because the default
+values do not take into account host and target names.  
+
+   The contents of the variable `RUNTESTFLAGS' are passed to the
+`runtest' invocation.  This is considered a "user variable" (*note User
+Variables::).  If you need to set `runtest' flags in `Makefile.am', you
+can use `AM_RUNTESTFLAGS' instead.  
+
+   In either case, the testing is done via `make check'.
+
+
+File: automake1.5.info,  Node: Options,  Next: Miscellaneous,  Prev: Tests,  Up: Top
+
+17 Changing Automake's Behavior
+*******************************
+
+Various features of Automake can be controlled by options in the
+`Makefile.am'.  Such options are listed in a special variable named
+`AUTOMAKE_OPTIONS'.  Currently understood options are: 
+
+`gnits'
+`gnu'
+`foreign'
+`cygnus'
+     Set the strictness as appropriate.  The `gnits' option also implies
+     `readme-alpha' and `check-news'.
+
+`ansi2knr'
+`PATH/ansi2knr'
+     Turn on automatic de-ANSI-fication.  *Note ANSI::.  If preceded by
+     a path, the generated `Makefile.in' will look in the specified
+     directory to find the `ansi2knr' program.  The path should be a
+     relative path to another directory in the same distribution
+     (Automake currently does not check this).
+
+`check-news'
+     Cause `make dist' to fail unless the current version number appears
+     in the first few lines of the `NEWS' file.
+
+`dejagnu'
+     Cause `dejagnu'-specific rules to be generated.  *Note Tests::.
+
+`dist-bzip2'
+     Generate a `dist-bzip2' target as well as the ordinary `dist'
+     target.  This new target will create a bzip2 tar archive of the
+     distribution.  bzip2 archives are frequently smaller than even
+     gzipped archives.  
+
+`dist-shar'
+     Generate a `dist-shar' target as well as the ordinary `dist'
+     target.  This new target will create a shar archive of the
+     distribution.  
+
+`dist-zip'
+     Generate a `dist-zip' target as well as the ordinary `dist'
+     target.  This new target will create a zip archive of the
+     distribution.  
+
+`dist-tarZ'
+     Generate a `dist-tarZ' target as well as the ordinary `dist'
+     target.  This new target will create a compressed tar archive of
+     the distribution.  
+
+`no-dependencies'
+     This is similar to using `--include-deps' on the command line, but
+     is useful for those situations where you don't have the necessary
+     bits to make automatic dependency tracking work *Note
+     Dependencies::.  In this case the effect is to effectively disable
+     automatic dependency tracking.
+
+`no-exeext'
+     If your `Makefile.am' defines a target `foo', it will override a
+     target named `foo$(EXEEXT)'.  This is necessary when `EXEEXT' is
+     found to be empty.  However, by default automake will generate an
+     error for this use.  The `no-exeext' option will disable this
+     error.  This is intended for use only where it is known in advance
+     that the package will not be ported to Windows, or any other
+     operating system using extensions on executables.
+
+`no-installinfo'
+     The generated `Makefile.in' will not cause info pages to be built
+     or installed by default.  However, `info' and `install-info'
+     targets will still be available.  This option is disallowed at
+     `GNU' strictness and above.  
+
+`no-installman'
+     The generated `Makefile.in' will not cause man pages to be
+     installed by default.  However, an `install-man' target will still
+     be available for optional installation.  This option is disallowed
+     at `GNU' strictness and above.  
+
+`nostdinc'
+     This option can be used to disable the standard `-I' options which
+     are ordinarily automatically provided by Automake.
+
+`no-texinfo.tex'
+     Don't require `texinfo.tex', even if there are texinfo files in
+     this directory.
+
+`readme-alpha'
+     If this release is an alpha release, and the file `README-alpha'
+     exists, then it will be added to the distribution.  If this option
+     is given, version numbers are expected to follow one of two forms.
+     The first form is `MAJOR.MINOR.ALPHA', where each element is a
+     number; the final period and number should be left off for
+     non-alpha releases.  The second form is `MAJOR.MINORALPHA', where
+     ALPHA is a letter; it should be omitted for non-alpha releases.
+
+`subdir-objects'
+     If this option is specified, then objects are placed into the
+     subdirectory of the build directory corresponding to the
+     subdirectory of the source file.  For instance if the source file
+     is `subdir/file.cxx', then the output file would be
+     `subdir/file.o'.
+
+VERSION
+     A version number (e.g. `0.30') can be specified.  If Automake is
+     not newer than the version specified, creation of the `Makefile.in'
+     will be suppressed.
+
+   Unrecognized options are diagnosed by `automake'.
+
+
+File: automake1.5.info,  Node: Miscellaneous,  Next: Include,  Prev: Options,  Up: Top
+
+18 Miscellaneous Rules
+**********************
+
+There are a few rules and variables that didn't fit anywhere else.
+
+* Menu:
+
+* Tags::                        Interfacing to etags and mkid
+* Suffixes::                    Handling new file extensions
+* Multilibs::                   Support for multilibbing.
+
+
+File: automake1.5.info,  Node: Tags,  Next: Suffixes,  Prev: Miscellaneous,  Up: Miscellaneous
+
+18.1 Interfacing to `etags'
+===========================
+
+Automake will generate rules to generate `TAGS' files for use with GNU
+Emacs under some circumstances.
+
+   If any C, C++ or Fortran 77 source code or headers are present, then
+`tags' and `TAGS' targets will be generated for the directory.  
+
+   At the topmost directory of a multi-directory package, a `tags'
+target file will be generated which, when run, will generate a `TAGS'
+file that includes by reference all `TAGS' files from subdirectories.
+
+   The `tags' target will also be generated if the variable
+`ETAGS_ARGS' is defined.  This variable is intended for use in
+directories which contain taggable source that `etags' does not
+understand.  
+
+   Here is how Automake generates tags for its source, and for nodes in
+its Texinfo file:
+
+     ETAGS_ARGS = automake.in --lang=none \
+      --regex='/^@node[ \t]+\([^,]+\)/\1/' automake.texi
+
+   If you add filenames to `ETAGS_ARGS', you will probably also want to
+set `TAGS_DEPENDENCIES'.  The contents of this variable are added
+directly to the dependencies for the `tags' target.  
+
+   Automake will also generate an `ID' target which will run `mkid' on
+the source.  This is only supported on a directory-by-directory basis.  
+
+   Automake also supports the GNU Global Tags program
+(http://www.gnu.org/software/global/).  The `GTAGS' target runs Global
+Tags automatically and puts the result in the top build directory.  The
+variable `GTAGS_ARGS' holds arguments which are passed to `gtags'.  
+
+
+File: automake1.5.info,  Node: Suffixes,  Next: Multilibs,  Prev: Tags,  Up: Miscellaneous
+
+18.2 Handling new file extensions
+=================================
+
+It is sometimes useful to introduce a new implicit rule to handle a file
+type that Automake does not know about.  If this is done, you must
+notify GNU Make of the new suffixes.  This can be done by putting a list
+of new suffixes in the `SUFFIXES' variable.  
+
+   For instance, suppose you had a compiler which could compile `.foo'
+files to `.o' files.  Then you would add `.foo' to your suffix list:
+
+     SUFFIXES = .foo
+
+   Then you could directly use a `.foo' file in a `_SOURCES' variable
+and expect the correct results:
+
+     bin_PROGRAMS = doit
+     doit_SOURCES = doit.foo
+
+   Any given `SUFFIXES' go at the start of the generated suffixes list,
+followed by automake generated suffixes not already in the list.
+
+
+File: automake1.5.info,  Node: Multilibs,  Prev: Suffixes,  Up: Miscellaneous
+
+18.3 Support for Multilibs
+==========================
+
+Automake has support for an obscure feature called multilibs.  A
+"multilib" is a library which is built for multiple different ABIs at a
+single time; each time the library is built with a different target
+flag combination.  This is only useful when the library is intended to
+be cross-compiled, and it is almost exclusively used for compiler
+support libraries.
+
+   The multilib support is still experimental.  Only use it if you are
+familiar with multilibs and can debug problems you might encounter.
+
+
+File: automake1.5.info,  Node: Include,  Next: Conditionals,  Prev: Miscellaneous,  Up: Top
+
+19 Include
+**********
+
+Automake supports an `include' directive which can be used to include
+other `Makefile' fragments when `automake' is run.  Note that these
+fragments are read and interpreted by `automake', not by `make'.  As
+with conditionals, `make' has no idea that `include' is in use.
+
+   There are two forms of `include':
+
+`include $(srcdir)/file'
+     Include a fragment which is found relative to the current source
+     directory.
+
+`include $(top_srcdir)/file'
+     Include a fragment which is found relative to the top source
+     directory.
+
+   Note that if a fragment is included inside a conditional, then the
+condition applies to the entire contents of that fragment.
+
+
+File: automake1.5.info,  Node: Conditionals,  Next: Gnits,  Prev: Include,  Up: Top
+
+20 Conditionals
+***************
+
+Automake supports a simple type of conditionals.
+
+   Before using a conditional, you must define it by using
+`AM_CONDITIONAL' in the `configure.in' file (*note Macros::).
+
+ -- Macro: AM_CONDITIONAL (CONDITIONAL, CONDITION)
+     The conditional name, CONDITIONAL, should be a simple string
+     starting with a letter and containing only letters, digits, and
+     underscores.  It must be different from `TRUE' and `FALSE' which
+     are reserved by Automake.
+
+     The shell CONDITION (suitable for use in a shell `if' statement)
+     is evaluated when `configure' is run.  Note that you must arrange
+     for _every_ `AM_CONDITIONAL' to be invoked every time `configure'
+     is run - if `AM_CONDITIONAL' is run conditionally (e.g., in a
+     shell `if' statement), then the result will confuse automake.
+
+   Conditionals typically depend upon options which the user provides to
+the `configure' script.  Here is an example of how to write a
+conditional which is true if the user uses the `--enable-debug' option.
+
+     AC_ARG_ENABLE(debug,
+     [  --enable-debug    Turn on debugging],
+     [case "${enableval}" in
+       yes) debug=true ;;
+       no)  debug=false ;;
+       *) AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
+     esac],[debug=false])
+     AM_CONDITIONAL(DEBUG, test x$debug = xtrue)
+
+   Here is an example of how to use that conditional in `Makefile.am':
+
+     if DEBUG
+     DBG = debug
+     else
+     DBG =
+     endif
+     noinst_PROGRAMS = $(DBG)
+
+   This trivial example could also be handled using EXTRA_PROGRAMS
+(*note A Program::).
+
+   You may only test a single variable in an `if' statement, possibly
+negated using `!'.  The `else' statement may be omitted.  Conditionals
+may be nested to any depth.  You may specify an argument to `else' in
+which case it must be the negation of the condition used for the
+current `if'.  Similarly you may specify the condition which is closed
+by an `end':
+
+     if DEBUG
+     DBG = debug
+     else !DEBUG
+     DBG =
+     endif !DEBUG
+
+Unbalanced conditions are errors.
+
+   Note that conditionals in Automake are not the same as conditionals
+in GNU Make.  Automake conditionals are checked at configure time by the
+`configure' script, and affect the translation from `Makefile.in' to
+`Makefile'.  They are based on options passed to `configure' and on
+results that `configure' has discovered about the host system.  GNU
+Make conditionals are checked at `make' time, and are based on
+variables passed to the make program or defined in the `Makefile'.
+
+   Automake conditionals will work with any make program.
+
+
+File: automake1.5.info,  Node: Gnits,  Next: Cygnus,  Prev: Conditionals,  Up: Top
+
+21 The effect of `--gnu' and `--gnits'
+**************************************
+
+The `--gnu' option (or `gnu' in the `AUTOMAKE_OPTIONS' variable) causes
+`automake' to check the following:
+
+   * The files `INSTALL', `NEWS', `README', `COPYING', `AUTHORS', and
+     `ChangeLog' are required at the topmost directory of the package.
+
+   * The options `no-installman' and `no-installinfo' are prohibited.
+
+   Note that this option will be extended in the future to do even more
+checking; it is advisable to be familiar with the precise requirements
+of the GNU standards.  Also, `--gnu' can require certain non-standard
+GNU programs to exist for use by various maintainer-only targets; for
+instance in the future `pathchk' might be required for `make dist'.
+
+   The `--gnits' option does everything that `--gnu' does, and checks
+the following as well:
+
+   * `make dist' will check to make sure the `NEWS' file has been
+     updated to the current version.
+
+   * `VERSION' is checked to make sure its format complies with Gnits
+     standards.
+
+   * If `VERSION' indicates that this is an alpha release, and the file
+     `README-alpha' appears in the topmost directory of a package, then
+     it is included in the distribution.  This is done in `--gnits'
+     mode, and no other, because this mode is the only one where version
+     number formats are constrained, and hence the only mode where
+     Automake can automatically determine whether `README-alpha' should
+     be included.
+
+   * The file `THANKS' is required.
+
+
+File: automake1.5.info,  Node: Cygnus,  Next: Extending,  Prev: Gnits,  Up: Top
+
+22 The effect of `--cygnus'
+***************************
+
+Some packages, notably GNU GCC and GNU gdb, have a build environment
+originally written at Cygnus Support (subsequently renamed Cygnus
+Solutions, and then later purchased by Red Hat).  Packages with this
+ancestry are sometimes referred to as "Cygnus" trees.
+
+   A Cygnus tree has slightly different rules for how a `Makefile.in'
+is to be constructed.  Passing `--cygnus' to `automake' will cause any
+generated `Makefile.in' to comply with Cygnus rules.
+
+   Here are the precise effects of `--cygnus':
+
+   * Info files are always created in the build directory, and not in
+     the source directory.
+
+   * `texinfo.tex' is not required if a Texinfo source file is
+     specified.  The assumption is that the file will be supplied, but
+     in a place that Automake cannot find.  This assumption is an
+     artifact of how Cygnus packages are typically bundled.
+
+   * `make dist' is not supported, and the rules for it are not
+     generated.  Cygnus-style trees use their own distribution
+     mechanism.
+
+   * Certain tools will be searched for in the build tree as well as in
+     the user's `PATH'.  These tools are `runtest', `expect',
+     `makeinfo' and `texi2dvi'.
+
+   * `--foreign' is implied.
+
+   * The options `no-installinfo' and `no-dependencies' are implied.
+
+   * The macros `AM_MAINTAINER_MODE' and `AM_CYGWIN32' are required.
+
+   * The `check' target doesn't depend on `all'.
+
+   GNU maintainers are advised to use `gnu' strictness in preference to
+the special Cygnus mode.  Some day, perhaps, the differences between
+Cygnus trees and GNU trees will disappear (for instance, as GCC is made
+more standards compliant).  At that time the special Cygnus mode will be
+removed.
+
+
+File: automake1.5.info,  Node: Extending,  Next: Distributing,  Prev: Cygnus,  Up: Top
+
+23 When Automake Isn't Enough
+*****************************
+
+Automake's implicit copying semantics means that many problems can be
+worked around by simply adding some `make' targets and rules to
+`Makefile.in'.  Automake will ignore these additions.
+
+   There are some caveats to doing this.  Although you can overload a
+target already used by Automake, it is often inadvisable, particularly
+in the topmost directory of a package with subdirectories.  However,
+various useful targets have a `-local' version you can specify in your
+`Makefile.in'.  Automake will supplement the standard target with these
+user-supplied targets.
+
+   The targets that support a local version are `all', `info', `dvi',
+`check', `install-data', `install-exec', `uninstall', and the various
+`clean' targets (`mostlyclean', `clean', `distclean', and
+`maintainer-clean').  Note that there are no `uninstall-exec-local' or
+`uninstall-data-local' targets; just use `uninstall-local'.  It doesn't
+make sense to uninstall just data or just executables.  
+
+   For instance, here is one way to install a file in `/etc':
+
+     install-data-local:
+             $(INSTALL_DATA) $(srcdir)/afile /etc/afile
+
+   Some targets also have a way to run another target, called a "hook",
+after their work is done.  The hook is named after the principal target,
+with `-hook' appended.  The targets allowing hooks are `install-data',
+`install-exec', `dist', and `distcheck'.  
+
+   For instance, here is how to create a hard link to an installed
+program:
+
+     install-exec-hook:
+             ln $(bindir)/program $(bindir)/proglink
+
+
+File: automake1.5.info,  Node: Distributing,  Next: Macro and Variable Index,  Prev: Extending,  Up: Top
+
+24 Distributing `Makefile.in's
+******************************
+
+Automake places no restrictions on the distribution of the resulting
+`Makefile.in's.  We still encourage software authors to distribute
+their work under terms like those of the GPL, but doing so is not
+required to use Automake.
+
+   Some of the files that can be automatically installed via the
+`--add-missing' switch do fall under the GPL.  However, these also have
+a special exception allowing you to distribute them with your package,
+regardless of the licensing you choose.
+
+
+File: automake1.5.info,  Node: Macro and Variable Index,  Next: General Index,  Prev: Distributing,  Up: Top
+
+Macro and Variable Index
+************************
+
+ [index ]
+* Menu:
+
+* _LDADD:                                A Program.           (line 111)
+* _LDFLAGS:                              A Program.           (line 133)
+* _LIBADD:                               A Library.           (line  27)
+* _SOURCES:                              A Program.           (line  38)
+* _TEXINFOS:                             Texinfo.             (line  49)
+* AC_CANONICAL_HOST:                     Optional.            (line  36)
+* AC_CANONICAL_SYSTEM:                   Optional.            (line  41)
+* AC_CHECK_PROG:                         Optional.            (line 132)
+* AC_CHECK_PROGS:                        Optional.            (line 132)
+* AC_CHECK_TOOL:                         Optional.            (line 132)
+* AC_CHECK_TOOL([STRIP],[strip]):        Requirements.        (line  25)
+* AC_CONFIG_AUX_DIR:                     Optional.            (line  22)
+* AC_CONFIG_HEADER:                      Optional.            (line  14)
+* AC_DECL_YYTEXT:                        Optional.            (line  99)
+* AC_F77_LIBRARY_LDFLAGS:                Optional.            (line  85)
+* AC_FUNC_ALLOCA:                        Optional.            (line  60)
+* AC_FUNC_FNMATCH:                       Optional.            (line  60)
+* AC_FUNC_GETLOADAVG:                    Optional.            (line  60)
+* AC_FUNC_MEMCMP:                        Optional.            (line  60)
+* AC_FUNC_MKTIME:                        Optional.            (line  60)
+* AC_OUTPUT:                             Requirements.        (line  19)
+* AC_PATH_PROG:                          Optional.            (line 132)
+* AC_PATH_PROGS:                         Optional.            (line 132)
+* AC_PATH_XTRA:                          Optional.            (line  28)
+* AC_PROG_CXX:                           Optional.            (line  74)
+* AC_PROG_F77:                           Optional.            (line  79)
+* AC_PROG_LEX:                           Optional.            (line 103)
+* AC_PROG_LIBTOOL:                       Optional.            (line  89)
+* AC_PROG_RANLIB:                        Optional.            (line  70)
+* AC_PROG_YACC:                          Optional.            (line  95)
+* AC_REPLACE_FUNCS:                      Optional.            (line  60)
+* AC_REPLACE_GNU_GETOPT:                 Optional.            (line  60)
+* AC_STRUCT_ST_BLOCKS:                   Optional.            (line  60)
+* AC_SUBST:                              Optional.            (line 132)
+* AM_C_PROTOTYPES <1>:                   Macros.              (line  45)
+* AM_C_PROTOTYPES <2>:                   Optional.            (line 107)
+* AM_C_PROTOTYPES:                       ANSI.                (line  30)
+* AM_CFLAGS:                             Program variables.   (line  32)
+* AM_CONDITIONAL:                        Conditionals.        (line  12)
+* AM_CONFIG_HEADER:                      Macros.              (line   9)
+* AM_CPPFLAGS:                           Program variables.   (line  15)
+* am_cv_sys_posix_termios:               Macros.              (line 122)
+* AM_CXXFLAGS:                           C++ Support.         (line  22)
+* AM_FFLAGS:                             Fortran 77 Support.  (line  22)
+* AM_FUNC_ERROR_AT_LINE:                 Macros.              (line  34)
+* AM_FUNC_OBSTACK:                       Macros.              (line  38)
+* AM_FUNC_STRTOD <1>:                    Optional.            (line  60)
+* AM_FUNC_STRTOD:                        Macros.              (line  30)
+* AM_GCJFLAGS:                           Java Support.        (line  24)
+* AM_GNU_GETTEXT:                        Optional.            (line 113)
+* AM_HEADER_TIOCGWINSZ_NEEDS_SYS_IOCTL:  Macros.              (line  50)
+* AM_INIT_AUTOMAKE:                      Requirements.        (line   8)
+* AM_JAVACFLAGS:                         Java.                (line  30)
+* AM_MAINTAINER_MODE:                    Optional.            (line 121)
+* AM_MAKEINFOFLAGS:                      Texinfo.             (line  44)
+* AM_PATH_LISPDIR:                       Macros.              (line  65)
+* AM_PROG_GCJ:                           Macros.              (line 108)
+* AM_RFLAGS:                             Fortran 77 Support.  (line  28)
+* AM_RUNTESTFLAGS:                       Tests.               (line  62)
+* AM_WITH_REGEX:                         Optional.            (line  60)
+* AS:                                    Assembly Support.    (line  11)
+* ASFLAGS:                               Assembly Support.    (line  11)
+* AUTOMAKE_OPTIONS <1>:                  ANSI.                (line  14)
+* AUTOMAKE_OPTIONS <2>:                  Dependencies.        (line  32)
+* AUTOMAKE_OPTIONS:                      Options.             (line   8)
+* bin_PROGRAMS:                          A Program.           (line   9)
+* bin_SCRIPTS:                           Scripts.             (line  22)
+* build_alias:                           Optional.            (line  41)
+* BUILT_SOURCES:                         Sources.             (line   8)
+* check_LTLIBRARIES:                     A Shared Library.    (line  18)
+* CLASSPATH_ENV:                         Java.                (line  39)
+* CLEANFILES:                            Clean.               (line  11)
+* COMPILE:                               Program variables.   (line  38)
+* CXX:                                   C++ Support.         (line  16)
+* CXXCOMPILE:                            C++ Support.         (line  25)
+* CXXFLAGS:                              C++ Support.         (line  19)
+* CXXLINK:                               C++ Support.         (line  29)
+* DATA <1>:                              Uniform.             (line  76)
+* DATA:                                  Data.                (line   7)
+* data_DATA:                             Data.                (line   9)
+* DEJATOOL:                              Tests.               (line  57)
+* DESTDIR:                               Install.             (line  76)
+* dist_:                                 Dist.                (line  44)
+* DIST_SUBDIRS:                          Dist.                (line  70)
+* DISTCLEANFILES:                        Clean.               (line  11)
+* ELCFILES:                              Emacs Lisp.          (line  11)
+* ETAGS_ARGS:                            Tags.                (line  19)
+* EXPECT:                                Tests.               (line  57)
+* EXTRA_DIST:                            Dist.                (line  35)
+* EXTRA_PROGRAMS:                        A Program.           (line  94)
+* F77:                                   Fortran 77 Support.  (line  16)
+* F77COMPILE:                            Fortran 77 Support.  (line  31)
+* FFLAGS:                                Fortran 77 Support.  (line  19)
+* FLINK:                                 Fortran 77 Support.  (line  35)
+* GCJFLAGS:                              Java Support.        (line  14)
+* GTAGS_ARGS:                            Tags.                (line  37)
+* HAVE_PTRDIFF_T:                        Macros.              (line 128)
+* HEADERS <1>:                           Uniform.             (line  76)
+* HEADERS:                               Headers.             (line   8)
+* host_alias:                            Optional.            (line  36)
+* host_triplet:                          Optional.            (line  36)
+* include_HEADERS:                       Headers.             (line  16)
+* INCLUDES:                              Program variables.   (line  27)
+* info_TEXINFOS:                         Texinfo.             (line  10)
+* JAVA:                                  Uniform.             (line  76)
+* JAVAC:                                 Java.                (line  23)
+* JAVACFLAGS:                            Java.                (line  26)
+* JAVAROOT:                              Java.                (line  35)
+* LDADD:                                 A Program.           (line 104)
+* LDFLAGS:                               Program variables.   (line  11)
+* lib_LIBRARIES:                         A Library.           (line   6)
+* lib_LTLIBRARIES:                       A Shared Library.    (line  18)
+* LIBADD:                                A Library.           (line  27)
+* libexec_PROGRAMS:                      A Program.           (line   9)
+* libexec_SCRIPTS:                       Scripts.             (line  22)
+* LIBOBJS:                               Optional.            (line  66)
+* LIBRARIES:                             Uniform.             (line  76)
+* LINK:                                  Program variables.   (line  42)
+* LISP <1>:                              Emacs Lisp.          (line   6)
+* LISP:                                  Uniform.             (line  76)
+* lisp_LISP:                             Emacs Lisp.          (line   6)
+* localstate_DATA:                       Data.                (line   9)
+* MAINTAINERCLEANFILES:                  Clean.               (line  11)
+* MAKE:                                  Top level.           (line  54)
+* MAKEFLAGS:                             Top level.           (line  54)
+* MAKEINFO:                              Texinfo.             (line  44)
+* MAKEINFOFLAGS:                         Texinfo.             (line  44)
+* man_MANS:                              Man pages.           (line  10)
+* MANS <1>:                              Man pages.           (line  10)
+* MANS:                                  Uniform.             (line  76)
+* MOSTLYCLEANFILES:                      Clean.               (line  11)
+* nodist_:                               Dist.                (line  44)
+* noinst_HEADERS:                        Headers.             (line   6)
+* noinst_LIBRARIES:                      A Library.           (line   6)
+* noinst_LISP:                           Emacs Lisp.          (line   6)
+* noinst_LTLIBRARIES:                    A Shared Library.    (line  18)
+* noinst_PROGRAMS:                       A Program.           (line   9)
+* noinst_SCRIPTS:                        Scripts.             (line  22)
+* oldinclude_HEADERS:                    Headers.             (line  16)
+* PACKAGE <1>:                           Uniform.             (line  28)
+* PACKAGE:                               Dist.                (line  12)
+* pkgdata_DATA:                          Data.                (line   9)
+* pkgdata_SCRIPTS:                       Scripts.             (line  22)
+* pkgdatadir:                            Uniform.             (line  20)
+* pkginclude_HEADERS:                    Headers.             (line  16)
+* pkgincludedir:                         Uniform.             (line  20)
+* pkglib_LIBRARIES:                      A Library.           (line   6)
+* pkglib_LTLIBRARIES:                    A Shared Library.    (line  18)
+* pkglib_PROGRAMS:                       A Program.           (line   9)
+* pkglibdir:                             Uniform.             (line  20)
+* pkgpyexecdir:                          Python.              (line  57)
+* pkgpythondir:                          Python.              (line  48)
+* PROGRAMS:                              Uniform.             (line  18)
+* ptrdiff_t:                             Macros.              (line 128)
+* PYCFILES:                              Python.              (line  61)
+* pyexecdir:                             Python.              (line  53)
+* PYOFILES:                              Python.              (line  61)
+* PYTHON <1>:                            Python.              (line  22)
+* PYTHON:                                Uniform.             (line  76)
+* PYTHON_EXEC_PREFIX:                    Python.              (line  34)
+* PYTHON_PLATFORM:                       Python.              (line  39)
+* PYTHON_PREFIX:                         Python.              (line  29)
+* PYTHON_VERSION:                        Python.              (line  25)
+* pythondir:                             Python.              (line  44)
+* RFLAGS:                                Fortran 77 Support.  (line  25)
+* RUNTEST:                               Tests.               (line  57)
+* RUNTESTDEFAULTFLAGS:                   Tests.               (line  52)
+* RUNTESTFLAGS:                          Tests.               (line  62)
+* sbin_PROGRAMS:                         A Program.           (line   9)
+* sbin_SCRIPTS:                          Scripts.             (line  22)
+* SCRIPTS <1>:                           Uniform.             (line  76)
+* SCRIPTS:                               Scripts.             (line   9)
+* sharedstate_DATA:                      Data.                (line   9)
+* SOURCES:                               A Program.           (line  38)
+* SUBDIRS:                               Top level.           (line   8)
+* SUFFIXES:                              Suffixes.            (line   9)
+* sysconf_DATA:                          Data.                (line   9)
+* TAGS_DEPENDENCIES:                     Tags.                (line  29)
+* target_alias:                          Optional.            (line  41)
+* TESTS:                                 Tests.               (line  29)
+* TESTS_ENVIRONMENT:                     Tests.               (line  29)
+* TEXINFO_TEX:                           Texinfo.             (line  60)
+* TEXINFOS <1>:                          Texinfo.             (line  10)
+* TEXINFOS <2>:                          Uniform.             (line  76)
+* TEXINFOS:                              Texinfo.             (line  49)
+* VERSION:                               Dist.                (line  12)
+* WITH_DMALLOC:                          Macros.              (line 132)
+* WITH_REGEX:                            Macros.              (line 138)
+* XFAIL_TESTS:                           Tests.               (line  33)
+* YACC:                                  Optional.            (line  95)
+
+
+File: automake1.5.info,  Node: General Index,  Prev: Macro and Variable Index,  Up: Top
+
+General Index
+*************
+
+ [index ]
+* Menu:
+
+* ## (special Automake comment):         General Operation.   (line  49)
+* --acdir:                               aclocal options.     (line   9)
+* --add-missing:                         Invoking Automake.   (line  30)
+* --copy:                                Invoking Automake.   (line  46)
+* --cygnus:                              Invoking Automake.   (line  50)
+* --enable-maintainer-mode:              Optional.            (line 116)
+* --force-missing:                       Invoking Automake.   (line  55)
+* --foreign:                             Invoking Automake.   (line  61)
+* --gnits:                               Invoking Automake.   (line  65)
+* --gnu:                                 Invoking Automake.   (line  69)
+* --help <1>:                            Invoking Automake.   (line  73)
+* --help:                                aclocal options.     (line  13)
+* --include-deps:                        Invoking Automake.   (line  81)
+* --libdir:                              Invoking Automake.   (line  41)
+* --no-force:                            Invoking Automake.   (line  86)
+* --output:                              aclocal options.     (line  20)
+* --output-dir:                          Invoking Automake.   (line  93)
+* --print-ac-dir:                        aclocal options.     (line  23)
+* --verbose <1>:                         aclocal options.     (line  29)
+* --verbose:                             Invoking Automake.   (line 100)
+* --version <1>:                         Invoking Automake.   (line 104)
+* --version:                             aclocal options.     (line  32)
+* --Werror:                              Invoking Automake.   (line 108)
+* --with-dmalloc:                        Macros.              (line 132)
+* --with-regex:                          Macros.              (line 138)
+* --Wno-error:                           Invoking Automake.   (line 108)
+* -a:                                    Invoking Automake.   (line  30)
+* -c:                                    Invoking Automake.   (line  45)
+* -enable-debug, example:                Conditionals.        (line  23)
+* -f:                                    Invoking Automake.   (line  54)
+* -gnits, complete description:          Gnits.               (line  20)
+* -gnu, complete description:            Gnits.               (line   6)
+* -gnu, required files:                  Gnits.               (line   6)
+* -hook targets:                         Extending.           (line  29)
+* -I:                                    aclocal options.     (line  16)
+* -i:                                    Invoking Automake.   (line  77)
+* -local targets:                        Extending.           (line  10)
+* -o:                                    Invoking Automake.   (line  93)
+* -v:                                    Invoking Automake.   (line 100)
+* @ALLOCA@, special handling:            LIBOBJS.             (line   6)
+* @LIBOBJS@, special handling:           LIBOBJS.             (line   6)
+* @LTLIBOBJS@, special handling:         A Shared Library.    (line  28)
+* _DATA primary, defined:                Data.                (line   6)
+* _DEPENDENCIES, defined:                A Program.           (line 135)
+* _HEADERS primary, defined:             Headers.             (line   6)
+* _JAVA primary, defined:                Java.                (line   6)
+* _LDFLAGS, defined:                     A Program.           (line 131)
+* _LIBADD primary, defined:              A Library.           (line  25)
+* _LIBRARIES primary, defined:           A Library.           (line   6)
+* _LISP primary, defined:                Emacs Lisp.          (line   6)
+* _LTLIBRARIES primary, defined:         A Shared Library.    (line  10)
+* _MANS primary, defined:                Man pages.           (line   6)
+* _PROGRAMS primary variable:            Uniform.             (line  12)
+* _PYTHON primary, defined:              Python.              (line   6)
+* _SCRIPTS primary, defined:             Scripts.             (line   6)
+* _SOURCES and header files:             A Program.           (line  44)
+* _SOURCES primary, defined:             A Program.           (line  35)
+* _TEXINFOS primary, defined:            Texinfo.             (line   6)
+* AC_OUTPUT, scanning:                   Requirements.        (line  13)
+* acinclude.m4, defined:                 Complete.            (line  21)
+* aclocal program, introduction:         Complete.            (line  21)
+* aclocal search path:                   Macro search path.   (line   6)
+* aclocal, extending:                    Extending aclocal.   (line   6)
+* aclocal, Invoking:                     Invoking aclocal.    (line   6)
+* aclocal, Options:                      aclocal options.     (line   6)
+* aclocal.m4, preexisting:               Complete.            (line  21)
+* ACLOCAL_AMFLAGS:                       Rebuilding.          (line  17)
+* Adding new SUFFIXES:                   Suffixes.            (line   6)
+* all:                                   Extending.           (line  22)
+* all-local:                             Extending.           (line  17)
+* AM_INIT_AUTOMAKE, example use:         Complete.            (line  11)
+* ansi2knr:                              ANSI.                (line  14)
+* Automake constraints:                  Introduction.        (line  22)
+* Automake options:                      Invoking Automake.   (line  26)
+* Automake requirements <1>:             Requirements.        (line   6)
+* Automake requirements:                 Introduction.        (line  27)
+* Automake, invoking:                    Invoking Automake.   (line   6)
+* Automake, recursive operation:         General Operation.   (line  39)
+* Automatic dependency tracking:         Dependencies.        (line  11)
+* Automatic linker selection:            How the Linker is Chosen.
+                                                              (line   6)
+* Auxiliary programs:                    Auxiliary Programs.  (line   6)
+* Avoiding path stripping:               Alternative.         (line  24)
+* BUGS, reporting:                       Introduction.        (line  31)
+* BUILT_SOURCES, defined:                Sources.             (line   6)
+* C++ support:                           C++ Support.         (line   6)
+* canonicalizing Automake macros:        Canonicalization.    (line   6)
+* cfortran:                              Mixing Fortran 77 With C and C++.
+                                                              (line   6)
+* check:                                 Extending.           (line  22)
+* check primary prefix, definition:      Uniform.             (line  72)
+* check-local:                           Extending.           (line  17)
+* check_LTLIBRARIES, not allowed:        A Shared Library.    (line  18)
+* clean-local:                           Extending.           (line  17)
+* Comment, special to Automake:          General Operation.   (line  49)
+* Complete example:                      Complete.            (line   6)
+* Conditional example,  -enable-debug:   Conditionals.        (line  23)
+* Conditionals:                          Conditionals.        (line   6)
+* config.guess:                          Invoking Automake.   (line  28)
+* configure.in, from GNU Hello:          Hello.               (line  16)
+* configure.in, scanning:                configure.           (line   6)
+* Constraints of Automake:               Introduction.        (line  22)
+* cpio example:                          Uniform.             (line  37)
+* ctags Example:                         etags.               (line   6)
+* cvs-dist:                              General Operation.   (line  12)
+* cvs-dist, non-standard example:        General Operation.   (line  12)
+* Cygnus strictness:                     Cygnus.              (line   6)
+* DATA primary, defined:                 Data.                (line   6)
+* de-ANSI-fication, defined:             ANSI.                (line   6)
+* dejagnu:                               Tests.               (line  57)
+* depcomp:                               Dependencies.        (line  22)
+* Dependency tracking:                   Dependencies.        (line  11)
+* Dependency tracking, disabling:        Dependencies.        (line  35)
+* Disabling dependency tracking:         Dependencies.        (line  35)
+* dist:                                  Dist.                (line  12)
+* dist-bzip2:                            Options.             (line  36)
+* dist-hook <1>:                         Extending.           (line  32)
+* dist-hook:                             Dist.                (line  72)
+* dist-shar:                             Options.             (line  41)
+* dist-tarZ:                             Options.             (line  51)
+* dist-zip:                              Options.             (line  46)
+* distcheck:                             Dist.                (line  87)
+* distclean-local:                       Extending.           (line  17)
+* dmalloc, support for:                  Macros.              (line 132)
+* dvi:                                   Extending.           (line  22)
+* dvi-local:                             Extending.           (line  17)
+* E-mail, bug reports:                   Introduction.        (line  31)
+* EDITION Texinfo macro:                 Texinfo.             (line  12)
+* else:                                  Conditionals.        (line  38)
+* endif:                                 Conditionals.        (line  38)
+* etags Example:                         etags.               (line   6)
+* Example conditional -enable-debug:     Conditionals.        (line  23)
+* Example of recursive operation:        General Operation.   (line  39)
+* Example of shared libraries:           A Shared Library.    (line  10)
+* Example, ctags and etags:              etags.               (line   6)
+* Example, EXTRA_PROGRAMS:               Uniform.             (line  37)
+* Example, GNU Hello:                    Hello.               (line   6)
+* Example, handling Texinfo files:       Hello.               (line  61)
+* Example, mixed language:               Mixing Fortran 77 With C and C++.
+                                                              (line  37)
+* Example, regression test:              Hello.               (line  69)
+* Executable extension:                  EXEEXT.              (line   6)
+* Exit status 77, special interpretation: Tests.              (line  20)
+* Expected test failure:                 Tests.               (line  31)
+* Extending aclocal:                     Extending aclocal.   (line   6)
+* Extending list of installation directories: Uniform.        (line  56)
+* Extension, executable:                 EXEEXT.              (line   6)
+* Extra files distributed with Automake: Invoking Automake.   (line  28)
+* EXTRA_, prepending:                    Uniform.             (line  30)
+* EXTRA_prog_SOURCES, defined:           A Program.           (line  58)
+* EXTRA_PROGRAMS, defined <1>:           A Program.           (line  89)
+* EXTRA_PROGRAMS, defined:               Uniform.             (line  37)
+* Files distributed with Automake:       Invoking Automake.   (line  28)
+* First line of Makefile.am:             General Operation.   (line  55)
+* FLIBS, defined:                        Mixing Fortran 77 With C and C++.
+                                                              (line  21)
+* foreign strictness:                    Strictness.          (line  10)
+* Fortran 77 support:                    Fortran 77 Support.  (line   6)
+* Fortran 77, mixing with C and C++:     Mixing Fortran 77 With C and C++.
+                                                              (line   6)
+* Fortran 77, Preprocessing:             Preprocessing Fortran 77.
+                                                              (line   6)
+* Gettext support:                       gettext.             (line   6)
+* gnits strictness:                      Strictness.          (line  10)
+* GNU Gettext support:                   gettext.             (line   6)
+* GNU Hello, configure.in:               Hello.               (line  16)
+* GNU Hello, example:                    Hello.               (line   6)
+* GNU make extensions:                   General Operation.   (line  19)
+* GNU Makefile standards:                Introduction.        (line  12)
+* Header files in _SOURCES:              A Program.           (line  44)
+* HEADERS primary, defined:              Headers.             (line   6)
+* HEADERS, installation directories:     Headers.             (line  16)
+* Hello example:                         Hello.               (line   6)
+* Hello, configure.in:                   Hello.               (line  16)
+* hook targets:                          Extending.           (line  29)
+* HP-UX 10, lex problems:                Macros.              (line  91)
+* HTML support, example:                 Uniform.             (line  63)
+* id:                                    Tags.                (line  32)
+* if:                                    Conditionals.        (line  38)
+* include:                               Include.             (line   6)
+* INCLUDES, example usage:               Hello.               (line  77)
+* Including Makefile fragment:           Include.             (line   6)
+* info <1>:                              Options.             (line  73)
+* info:                                  Extending.           (line  22)
+* info-local:                            Extending.           (line  17)
+* install:                               Install.             (line  45)
+* Install hook:                          Install.             (line  71)
+* Install, two parts of:                 Install.             (line  45)
+* install-data <1>:                      Extending.           (line  22)
+* install-data:                          Install.             (line  45)
+* install-data-hook:                     Extending.           (line  32)
+* install-data-local <1>:                Install.             (line  65)
+* install-data-local:                    Extending.           (line  17)
+* install-exec <1>:                      Install.             (line  45)
+* install-exec:                          Extending.           (line  22)
+* install-exec-hook:                     Extending.           (line  32)
+* install-exec-local <1>:                Extending.           (line  17)
+* install-exec-local:                    Install.             (line  65)
+* install-info <1>:                      Options.             (line  73)
+* install-info:                          Texinfo.             (line  71)
+* install-info target:                   Texinfo.             (line  71)
+* install-man <1>:                       Man pages.           (line  37)
+* install-man:                           Options.             (line  79)
+* install-man target:                    Man pages.           (line  32)
+* install-strip:                         Install.             (line 102)
+* install-strip and STRIP:               Requirements.        (line  25)
+* Installation directories, extending list: Uniform.          (line  56)
+* Installation support:                  Install.             (line   6)
+* installdirs:                           Install.             (line 102)
+* Installing headers:                    Headers.             (line  16)
+* Installing scripts:                    Scripts.             (line  22)
+* Invoking aclocal:                      Invoking aclocal.    (line   6)
+* Invoking Automake:                     Invoking Automake.   (line   6)
+* JAVA primary, defined:                 Java.                (line   6)
+* JAVA restrictions:                     Java.                (line  13)
+* Java support:                          Java Support.        (line   6)
+* lex problems with HP-UX 10:            Macros.              (line  91)
+* lex, multiple lexers:                  Yacc and Lex.        (line  48)
+* LIBADD primary, defined:               A Library.           (line  25)
+* LIBRARIES primary, defined:            A Library.           (line   6)
+* Linking Fortran 77 with C and C++:     Mixing Fortran 77 With C and C++.
+                                                              (line   6)
+* LISP primary, defined:                 Emacs Lisp.          (line   6)
+* local targets:                         Extending.           (line  10)
+* LTLIBRARIES primary, defined:          A Shared Library.    (line  10)
+* Macro search path:                     Macro search path.   (line   6)
+* Macros Automake recognizes:            Optional.            (line   6)
+* Macros, overriding:                    General Operation.   (line  32)
+* make check:                            Tests.               (line   6)
+* make clean support:                    Clean.               (line   6)
+* make dist:                             Dist.                (line   9)
+* make distcheck:                        Dist.                (line   9)
+* make install support:                  Install.             (line   6)
+* Make targets, overriding:              General Operation.   (line  26)
+* Makefile fragment, including:          Include.             (line   6)
+* Makefile.am, first line:               General Operation.   (line  55)
+* MANS primary, defined:                 Man pages.           (line   6)
+* mdate-sh:                              Texinfo.             (line  12)
+* Mixed language example:                Mixing Fortran 77 With C and C++.
+                                                              (line  37)
+* Mixing Fortran 77 with C and C++:      Mixing Fortran 77 With C and C++.
+                                                              (line   6)
+* Mixing Fortran 77 with C and/or C++:   Mixing Fortran 77 With C and C++.
+                                                              (line   6)
+* mostlyclean-local:                     Extending.           (line  17)
+* Multiple configure.in files:           Invoking Automake.   (line   6)
+* Multiple lex lexers:                   Yacc and Lex.        (line  48)
+* Multiple yacc parsers:                 Yacc and Lex.        (line  48)
+* no-dependencies:                       Dependencies.        (line  32)
+* no-installinfo:                        Texinfo.             (line  71)
+* no-installman:                         Man pages.           (line  37)
+* no-texinfo.tex:                        Texinfo.             (line  67)
+* nobase_:                               Alternative.         (line  24)
+* noinst primary prefix, definition:     Uniform.             (line  69)
+* noinstall-info target:                 Texinfo.             (line  71)
+* noinstall-man target:                  Man pages.           (line  32)
+* Non-GNU packages:                      Strictness.          (line   6)
+* Non-standard targets:                  General Operation.   (line  12)
+* Objects in subdirectory:               Program and Library Variables.
+                                                              (line  51)
+* Option, ansi2knr:                      Options.             (line  19)
+* Option, check-news:                    Options.             (line  26)
+* Option, cygnus:                        Options.             (line  14)
+* Option, dejagnu:                       Options.             (line  30)
+* Option, dist-bzip2:                    Options.             (line  33)
+* Option, dist-shar:                     Options.             (line  39)
+* Option, dist-tarZ:                     Options.             (line  49)
+* Option, dist-zip:                      Options.             (line  44)
+* Option, foreign:                       Options.             (line  14)
+* Option, gnits:                         Options.             (line  14)
+* Option, gnu:                           Options.             (line  14)
+* Option, no-dependencies:               Options.             (line  54)
+* Option, no-exeext:                     Options.             (line  61)
+* Option, no-installinfo:                Options.             (line  70)
+* Option, no-installman:                 Options.             (line  76)
+* Option, no-texinfo:                    Options.             (line  86)
+* Option, nostdinc:                      Options.             (line  82)
+* Option, readme-alpha:                  Options.             (line  90)
+* Option, version:                       Options.             (line 106)
+* Options, aclocal:                      aclocal options.     (line   6)
+* Options, Automake:                     Invoking Automake.   (line  26)
+* Overriding make macros:                General Operation.   (line  32)
+* Overriding make targets:               General Operation.   (line  26)
+* Overriding SUBDIRS:                    Top level.           (line  27)
+* Path stripping, avoiding:              Alternative.         (line  24)
+* pkgdatadir, defined:                   Uniform.             (line  20)
+* pkgincludedir, defined:                Uniform.             (line  20)
+* pkglibdir, defined:                    Uniform.             (line  20)
+* POSIX termios headers:                 Macros.              (line 122)
+* Preprocessing Fortran 77:              Preprocessing Fortran 77.
+                                                              (line   6)
+* Primary variable, DATA:                Data.                (line   6)
+* Primary variable, defined:             Uniform.             (line  12)
+* Primary variable, HEADERS:             Headers.             (line   6)
+* Primary variable, JAVA:                Java.                (line   6)
+* Primary variable, LIBADD:              A Library.           (line  25)
+* Primary variable, LIBRARIES:           A Library.           (line   6)
+* Primary variable, LISP:                Emacs Lisp.          (line   6)
+* Primary variable, LTLIBRARIES:         A Shared Library.    (line  10)
+* Primary variable, MANS:                Man pages.           (line   6)
+* Primary variable, PROGRAMS:            Uniform.             (line  12)
+* Primary variable, PYTHON:              Python.              (line   6)
+* Primary variable, SCRIPTS:             Scripts.             (line   6)
+* Primary variable, SOURCES:             A Program.           (line  35)
+* Primary variable, TEXINFOS:            Texinfo.             (line   6)
+* prog_LDADD, defined:                   A Program.           (line 106)
+* PROGRAMS primary variable:             Uniform.             (line  12)
+* Programs, auxiliary:                   Auxiliary Programs.  (line   6)
+* PROGRAMS, bindir:                      A Program.           (line   9)
+* PYTHON primary, defined:               Python.              (line   6)
+* Ratfor programs:                       Preprocessing Fortran 77.
+                                                              (line   6)
+* README-alpha:                          Gnits.               (line  29)
+* Recognized macros by Automake:         Optional.            (line   6)
+* Recursive operation of Automake:       General Operation.   (line  39)
+* regex package:                         Macros.              (line 138)
+* Regression test example:               Hello.               (line  69)
+* Reporting BUGS:                        Introduction.        (line  31)
+* Requirements of Automake:              Requirements.        (line   6)
+* Requirements, Automake:                Introduction.        (line  27)
+* Restrictions for JAVA:                 Java.                (line  13)
+* rx package:                            Macros.              (line 138)
+* Scanning configure.in:                 configure.           (line   6)
+* SCRIPTS primary, defined:              Scripts.             (line   6)
+* SCRIPTS, installation directories:     Scripts.             (line  22)
+* Selecting the linker automatically:    How the Linker is Chosen.
+                                                              (line   6)
+* Shared libraries, support for:         A Shared Library.    (line   6)
+* SOURCES primary, defined:              A Program.           (line  35)
+* Special Automake comment:              General Operation.   (line  49)
+* Strictness, defined:                   Strictness.          (line  10)
+* Strictness, foreign:                   Strictness.          (line  10)
+* Strictness, gnits:                     Strictness.          (line  10)
+* Strictness, gnu:                       Strictness.          (line  10)
+* STRIP, how to setup:                   Requirements.        (line  25)
+* Subdirectory, objects in:              Program and Library Variables.
+                                                              (line  51)
+* SUBDIRS, explained:                    Top level.           (line   6)
+* SUBDIRS, overriding:                   Top level.           (line  27)
+* suffix .la, defined:                   A Shared Library.    (line  10)
+* suffix .lo, defined:                   A Shared Library.    (line  23)
+* SUFFIXES, adding:                      Suffixes.            (line   6)
+* Support for C++:                       C++ Support.         (line   6)
+* Support for Fortran 77:                Fortran 77 Support.  (line   6)
+* Support for GNU Gettext:               gettext.             (line   6)
+* Support for Java:                      Java Support.        (line   6)
+* tags:                                  Tags.                (line  10)
+* TAGS support:                          Tags.                (line   6)
+* Target, install-info:                  Texinfo.             (line  71)
+* Target, install-man:                   Man pages.           (line  32)
+* Target, noinstall-info:                Texinfo.             (line  71)
+* Target, noinstall-man:                 Man pages.           (line  32)
+* termios POSIX headers:                 Macros.              (line 122)
+* Test suites:                           Tests.               (line   6)
+* Tests, expected failure:               Tests.               (line  31)
+* Texinfo file handling example:         Hello.               (line  61)
+* Texinfo macro, EDITION:                Texinfo.             (line  12)
+* Texinfo macro, UPDATED:                Texinfo.             (line  12)
+* Texinfo macro, UPDATED-MONTH:          Texinfo.             (line  12)
+* Texinfo macro, VERSION:                Texinfo.             (line  12)
+* texinfo.tex:                           Texinfo.             (line  54)
+* TEXINFOS primary, defined:             Texinfo.             (line   6)
+* Uniform naming scheme:                 Uniform.             (line   6)
+* uninstall <1>:                         Install.             (line 102)
+* uninstall:                             Extending.           (line  22)
+* uninstall-local:                       Extending.           (line  17)
+* UPDATED Texinfo macro:                 Texinfo.             (line  12)
+* UPDATED-MONTH Texinfo macro:           Texinfo.             (line  12)
+* user variables:                        User Variables.      (line   6)
+* variables, reserved for the user:      User Variables.      (line   6)
+* VERSION Texinfo macro:                 Texinfo.             (line  12)
+* Windows:                               EXEEXT.              (line   6)
+* yacc, multiple parsers:                Yacc and Lex.        (line  48)
+* ylwrap:                                Yacc and Lex.        (line  48)
+* zardoz example:                        Complete.            (line  33)
+
+
+
+Tag Table:
+Node: Top1148
+Node: Introduction2878
+Ref: Introduction-Footnote-14339
+Node: Generalities4540
+Node: General Operation5139
+Node: Strictness7489
+Node: Uniform9236
+Node: Canonicalization12868
+Node: User Variables13779
+Node: Auxiliary Programs15024
+Node: Examples17078
+Node: Complete17410
+Node: Hello19374
+Node: etags21975
+Node: Invoking Automake24293
+Node: configure28569
+Node: Requirements29493
+Node: Optional31019
+Node: Invoking aclocal36394
+Node: aclocal options38035
+Node: Macro search path39017
+Node: Macros43177
+Node: Extending aclocal49343
+Node: Top level50327
+Node: Alternative53549
+Ref: Alternative-Footnote-154744
+Node: Rebuilding54869
+Node: Programs55640
+Node: A Program56672
+Node: A Library62754
+Node: A Shared Library64033
+Node: Program and Library Variables66154
+Ref: Program and Library Variables-Footnote-174187
+Node: LIBOBJS74270
+Node: Program variables74936
+Node: Yacc and Lex76900
+Node: C++ Support81263
+Node: Assembly Support82105
+Node: Fortran 77 Support82773
+Ref: Fortran 77 Support-Footnote-184365
+Node: Preprocessing Fortran 7784568
+Node: Compiling Fortran 77 Files85175
+Node: Mixing Fortran 77 With C and C++85751
+Ref: Mixing Fortran 77 With C and C++-Footnote-188124
+Node: How the Linker is Chosen88427
+Node: Fortran 77 and Autoconf90993
+Node: Java Support91422
+Node: Support for Other Languages92458
+Node: ANSI93024
+Node: Dependencies95695
+Ref: Dependencies-Footnote-197325
+Node: EXEEXT97491
+Node: Other objects99657
+Node: Scripts100255
+Node: Headers101116
+Ref: Headers-Footnote-1101831
+Node: Data102064
+Node: Sources102723
+Node: Other GNU Tools103657
+Node: Emacs Lisp104151
+Node: gettext105218
+Node: Libtool105728
+Node: Java105986
+Node: Python107628
+Node: Documentation110216
+Node: Texinfo110523
+Node: Man pages113787
+Node: Install116089
+Node: Clean120489
+Node: Dist121623
+Node: Tests126240
+Node: Options129147
+Node: Miscellaneous133553
+Node: Tags133949
+Node: Suffixes135554
+Node: Multilibs136436
+Node: Include137074
+Node: Conditionals137856
+Node: Gnits140558
+Node: Cygnus142161
+Node: Extending143989
+Node: Distributing145665
+Node: Macro and Variable Index146314
+Node: General Index160369
+
+End Tag Table
